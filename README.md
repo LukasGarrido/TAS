@@ -15,13 +15,9 @@
 
 ## 1. Descripción del proyecto
 
-Nodo Sur es una red regional que agrupa pequeñas marcas, talleres creativos, productores y operadores de experiencias, quienes actualmente gestionan sus ventas, reservas, inscripciones y atención a clientes mediante las redes sociales, con formularios aislados y mensajería. Actualmente esta modalidad de operación dificulta la centralización de la información, aumenta el riesgo de perdida de datos y genera problemas de disponibilidad de servicios. 
+El proyecto tiene como propósito transformar un problema empresarial en una plataforma operable. El objetivo principal no es solamente instalar un CMS y mostrar su portada, sino construir una solución robusta que pueda ser publicada, administrada, diagnosticada, mantenida y recuperada ante posibles fallas. 
 
-El proyecto tiene como fin el diseñar e implementar una plataforma digital, la cual sea *centralizada, administrable* y *resiliente* que permita a distintos miembros de Nodo Sur publicar sus productos y experiencias, gestionar pedidos y reservas, ofrecer contenidos y mantener comunicación con sus clientes **desde un único dominio**.
-
-La solucion propuesta debe ser capaz de soportar periodos de aumento de demanda asociados a campañas de difusión, manteniendo la continuidad del servicio incluso ante la falla de uno de los nodos. Para esto se plantea una arquitectura compuesta por servicios separados, incluyendo una aplicación o CMS, servidores web, una base de datos independiente, balanceo de carga, mecanismos de monitorización, gestión de logs y respaldos.
-
-Este repositorio contiene la documentación, configuraciones, scripts, pruebas y evidencias asociadas al desarrollo de la plataforma como parte del proyecto integrador de **Taller de Administración de Sistemas (EIN-090B)** de la Universidad Técnica Federico Santa María.
+Para lograr esto, el equipo (JoseCarlos, Octavio, Lukas), deberán actuar como un proveedor de infraestructura. En este rol es fundamental justificar cada decisión técnica y sobre la arquitectura, mediante el establecimiento de requerimientos, la ejecución de pruebas, la recolección de métricas, el análisis de logs y la creación de procedimientos que sean completamente reproducibles.  
 
 ---
 
@@ -68,24 +64,32 @@ nodo-sur/
 
 ## 4. Caso de negocio
 
-> __
+Nodo Sur es una red regional que agrupa pequeñas marcas, talleres creativos, productores y operadores de experiencias, quienes actualmente gestionan sus ventas, reservas, inscripciones y atención a clientes mediante las redes sociales, con formularios aislados y mensajería. Actualmente esta modalidad de operación dificulta la centralización de la información, aumenta el riesgo de perdida de datos y genera problemas de disponibilidad de servicios. 
+
+El proyecto tiene como fin el diseñar e implementar una plataforma digital, la cual sea *centralizada, administrable* y *resiliente* que permita a distintos miembros de Nodo Sur publicar sus productos y experiencias, gestionar pedidos y reservas, ofrecer contenidos y mantener comunicación con sus clientes **desde un único dominio**.
+
+La solucion propuesta debe ser capaz de soportar periodos de aumento de demanda asociados a campañas de difusión, manteniendo la continuidad del servicio incluso ante la falla de uno de los nodos. Para esto se plantea una arquitectura compuesta por servicios separados, incluyendo una aplicación o CMS, servidores web, una base de datos independiente, balanceo de carga, mecanismos de monitorización, gestión de logs y respaldos.
+
+Este repositorio contiene la documentación, configuraciones, scripts, pruebas y evidencias asociadas al desarrollo de la plataforma como parte del proyecto integrador de **Taller de Administración de Sistemas (EIN-090B)** de la Universidad Técnica Federico Santa María.
 
 ---
 
 ## 5. Entrega 1 — Informe de requerimientos y arquitectura
 
 ### 5.1 Análisis del problema
-- **Actores:**
-- **Activos críticos:**
-- **Flujos de negocio:**
-- **Supuestos:**
+- **Actores:** Pequeñas marcas, talleres creativos, productores y operadores de experiencias de la red regional. Adicionalmente, el personal con capacitación básica que administrará la plataforma y los clientes finales
+- **Activos críticos:** El catálogo de productos y servicios, los registros de ventas e inscripciones a talleres, la base de datos separada y los archivos subidos al CMS.
+- **Flujos de negocio:** Venta de catálogo, inscripción a talleres, reservas con cupos limitados, publicación de contenidos y atención posventa
+- **Supuestos:** La organización no tiene un equipo de desarrollo permanente, por lo que la plataforma debe basarse en software libre o de bajo costo. El tráfico experimentará picos de demanda breves durante las campañas de difusión
 
 ### 5.2 Requerimientos
 
-| ID | Requerimiento | Tipo (F/NF) | Criterio de aceptación |
-|---|---|---|---|
-| RF-01 | | Funcional | |
-| RNF-01 | | No funcional | |
+| ID     | Requerimiento                                                                                | Tipo (F/NF)  | Criterio de aceptación                                                                                                             |
+| ------ | -------------------------------------------------------------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| RF-01  | Contar con un CMS funcional para catálogo, pedidos, reservas y administración de contenidos. | Funcional    | El CMS debe operar correctamente bajo un dominio unificado.                                                                        |
+| RNF-01 | Mantener la disponibilidad del servicio mediante al menos dos nodos web                      | No funcional | Un proxy (HAProxy) debe distribuir las solicitudes, realizar health checks y no enviar tráfico a un nodo declarado como defectuoso |
+| RNF-02 | Asegurar que la base de datos opere de manera independiente.                                 | No funcional | La base de datos debe ser accesible únicamente desde los orígenes, sin quedar expuesta a redes externas.                           |
+| RNF-03 | Garantizar la persistencia y coherencia del estado compartido.                               | No funcional | Los archivos, imágenes y sesiones deben mantenerse coherentes y disponibles aunque falle uno de los nodos.                         |
 
 ### 5.3 Selección de CMS y suite
 
