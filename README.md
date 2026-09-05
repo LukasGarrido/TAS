@@ -15,19 +15,25 @@
 
 ## 1. Descripción del proyecto
 
-> _Resumen 
+Nodo Sur es una red regional que agrupa pequeñas marcas, talleres creativos, productores y operadores de experiencias, quienes actualmente gestionan sus ventas, reservas, inscripciones y atención a clientes mediante las redes sociales, con formularios aislados y mensajería. Actualmente esta modalidad de operación dificulta la centralización de la información, aumenta el riesgo de perdida de datos y genera problemas de disponibilidad de servicios. 
+
+El proyecto tiene como fin el diseñar e implementar una plataforma digital, la cual sea *centralizada, administrable* y *resiliente* que permita a distintos miembros de Nodo Sur publicar sus productos y experiencias, gestionar pedidos y reservas, ofrecer contenidos y mantener comunicación con sus clientes **desde un único dominio**.
+
+La solucion propuesta debe ser capaz de soportar periodos de aumento de demanda asociados a campañas de difusión, manteniendo la continuidad del servicio incluso ante la falla de uno de los nodos. Para esto se plantea una arquitectura compuesta por servicios separados, incluyendo una aplicación o CMS, servidores web, una base de datos independiente, balanceo de carga, mecanismos de monitorización, gestión de logs y respaldos.
+
+Este repositorio contiene la documentación, configuraciones, scripts, pruebas y evidencias asociadas al desarrollo de la plataforma como parte del proyecto integrador de **Taller de Administración de Sistemas (EIN-090B)** de la Universidad Técnica Federico Santa María.
 
 ---
 
 ## 2. Estado del proyecto
 
-| Entrega | Hito | Estado | Fecha |
-|---|---|---|---|
-| 1 | Informe de requerimientos y arquitectura | 🔲 En curso | |
-| 2 | Plataforma base y CMS funcional | 🔲 Pendiente | |
-| 3 | Publicación resiliente y seguridad | 🔲 Pendiente | |
-| 4 | Observabilidad y continuidad operacional | 🔲 Pendiente | |
-| 5 | Incidente, auditoría y defensa final | 🔲 Pendiente | |
+| Entrega | Hito                                     | Estado       | Fecha |
+| ------- | ---------------------------------------- | ------------ | ----- |
+| 1       | Informe de requerimientos y arquitectura | 🔲 En curso  | 05/09 |
+| 2       | Plataforma base y CMS funcional          | 🔲 Pendiente |       |
+| 3       | Publicación resiliente y seguridad       | 🔲 Pendiente |       |
+| 4       | Observabilidad y continuidad operacional | 🔲 Pendiente |       |
+| 5       | Incidente, auditoría y defensa final     | 🔲 Pendiente |       |
 
 ---
 
@@ -60,7 +66,7 @@ nodo-sur/
 
 ---
 
-## 4. Caso de negocio (resumen)
+## 4. Caso de negocio
 
 > __
 
