@@ -90,6 +90,11 @@ Este repositorio contiene la documentación, configuraciones, scripts, pruebas y
 | RNF-01 | Mantener la disponibilidad del servicio mediante al menos dos nodos web                      | No funcional | Un proxy (HAProxy) debe distribuir las solicitudes, realizar health checks y no enviar tráfico a un nodo declarado como defectuoso |
 | RNF-02 | Asegurar que la base de datos opere de manera independiente.                                 | No funcional | La base de datos debe ser accesible únicamente desde los orígenes, sin quedar expuesta a redes externas.                           |
 | RNF-03 | Garantizar la persistencia y coherencia del estado compartido.                               | No funcional | Los archivos, imágenes y sesiones deben mantenerse coherentes y disponibles aunque falle uno de los nodos.                         |
+| RNF-04 | Administración remota solo por canales seguros y nominativos                                 | No funcional | Acceso SSH por clave pública, un usuario por integrante, sin cuentas compartidas, revocable individualmente                        |
+| RNF-05 | Detección de falla crítica en tiempo acotado                                                 | No funcional | Una alerta automática y verificable llega ante una falla, sin depender de que alguien esté observando un panel.                    |
+| RNF-06 | Continuidad mediante respaldos verificados                                                   | No funcional | Existe un diseño de backup con retención ≥30 días y un procedimiento de restauración definido (Entrega 4 xd)                       |
+| RNF-07 | Publicación bajo un dominio único con HTTPS válido                                           | No funcional | El sitio responde por nombre con certificado TLS válido.                                                                           |
+| RNF-08 | Trazabilidad y hora consistente en logs                                                      | No funcional | Los eventos de proxy, web, BD y SSH pueden correlacionarse por timestamp gracias a sincronización horaria.                         |
 
 ### 5.3 Selección de CMS y suite
 
@@ -100,7 +105,7 @@ Este repositorio contiene la documentación, configuraciones, scripts, pruebas y
 | Curva de operación     | Baja, perfecta para personal sin equipo técnico                | Media-alta. requiere entender estructura de cursos, roles, matrículas                                                                                                                                     | Baja para blogging, pero requiere Node.js y gestión distinta (no PHP/MySQL clásico)                                                                                                                                                 |
 | Límites conocidos      | Rendimiento con muchos plugins, requiere buena config de caché | No tiene módulo nativo de e-commerce ni catálogo de productos, forzar "talleres" como "cursos" desvirtúa el modelo de negocio                                                                             | No soporta e-commerce ni reservas nativamente, es esencialmente un motor de contenido/newsletter, no una plataforma transaccional                                                                                                   |
 | **Motivo de descarte** | —                                                              | El caso de negocio no es educativo: Nodo Sur vende productos, gestiona reservas con cupos y catálogo, no dicta cursos con evaluaciones. El usar Moodle sería forzar la herramienta al problema equivocado | Ghost está pensado para publicación de contenido/blogging, no maneja carrito de compra, inventario ni reservas.<br>Habría que integrar servicios externos para lo transaccional, aumentando la complejidad que el caso busca evitar |
-|                        |                                                                |                                                                                                                                                                                                           |                                                                                                                                                                                                                                     |
+
 
 **Justificación técnica de por que WordPress + Nginx**: 
 - Nginx maneja mejor conexiones concurrentes con menos consumo de recursos que Apache, relevante porque el caso explícitamente menciona picos de tráfico en campañas de difusión (RNF de disponibilidad).
@@ -141,12 +146,12 @@ Este repositorio contiene la documentación, configuraciones, scripts, pruebas y
 
 ### 5.7 Plan de implementación por etapas
 
-| Etapa | Entregable | Pruebas previstas | Responsable(s) |
-|---|---|---|---|
-| Entrega 2 | | | |
-| Entrega 3 | | | |
-| Entrega 4 | | | |
-| Entrega 5 | | | |
+| Etapa     | Entregable        | Pruebas previstas | Responsable(s) |
+| --------- | ----------------- | ----------------- | -------------- |
+| Entrega 2 | CMS montado en Vm |                   |                |
+| Entrega 3 |                   |                   |                |
+| Entrega 4 |                   |                   |                |
+| Entrega 5 |                   |                   |                |
 
 ### 5.8 Evidencias mínimas — checklist
 
