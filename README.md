@@ -93,13 +93,19 @@ Este repositorio contiene la documentación, configuraciones, scripts, pruebas y
 
 ### 5.3 Selección de CMS y suite
 
-| Criterio | Opción elegida | Alternativa descartada 1 | Alternativa descartada 2 |
-|---|---|---|---|
-| Licenciamiento | | | |
-| Comunidad/soporte | | | |
-| Curva de operación | | | |
-| Límites conocidos | | | |
-| **Motivo de descarte** | — | | |
+| Criterio               | WordPress                                                      | Alternativa descartada 1                                                                                                                                                                                  | Alternativa descartada 2                                                                                                                                                                                                            |
+| ---------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Licenciamiento         | GPL, gratuito                                                  | GPL, gratuito                                                                                                                                                                                             | MIT (core gratuito), planes cloud de pago para hosting propio                                                                                                                                                                       |
+| Comunidad/soporte      | Enorme, documentación abundante, muchos plugins de reservas    | Muy grande pero enfocada en e-learning (LMS)                                                                                                                                                              | Comunidad activa pero más pequeña y orientada a publishing                                                                                                                                                                          |
+| Curva de operación     | Baja, perfecta para personal sin equipo técnico                | Media-alta. requiere entender estructura de cursos, roles, matrículas                                                                                                                                     | Baja para blogging, pero requiere Node.js y gestión distinta (no PHP/MySQL clásico)                                                                                                                                                 |
+| Límites conocidos      | Rendimiento con muchos plugins, requiere buena config de caché | No tiene módulo nativo de e-commerce ni catálogo de productos, forzar "talleres" como "cursos" desvirtúa el modelo de negocio                                                                             | No soporta e-commerce ni reservas nativamente, es esencialmente un motor de contenido/newsletter, no una plataforma transaccional                                                                                                   |
+| **Motivo de descarte** | —                                                              | El caso de negocio no es educativo: Nodo Sur vende productos, gestiona reservas con cupos y catálogo, no dicta cursos con evaluaciones. El usar Moodle sería forzar la herramienta al problema equivocado | Ghost está pensado para publicación de contenido/blogging, no maneja carrito de compra, inventario ni reservas.<br>Habría que integrar servicios externos para lo transaccional, aumentando la complejidad que el caso busca evitar |
+|                        |                                                                |                                                                                                                                                                                                           |                                                                                                                                                                                                                                     |
+
+**Justificación técnica de por que WordPress + Nginx**: 
+- Nginx maneja mejor conexiones concurrentes con menos consumo de recursos que Apache, relevante porque el caso explícitamente menciona picos de tráfico en campañas de difusión (RNF de disponibilidad).
+- WordPress + WooCommerce cubre en un solo stack: catálogo, pedidos, contenido (blog/páginas) y con un plugin adicional de reservas (a definir, ej. Amelia/Bookly) el flujo de talleres con cupos limitados.
+- Al ser PHP + MySQL, es totalmente compatible con la arquitectura de referencia del enunciado (backend web + base de datos separada).
 
 ### 5.4 Diagrama de despliegue
 - Archivo: `docs/entrega-1/diagrama-despliegue.png`
