@@ -117,8 +117,8 @@ Este repositorio contiene la documentación, configuraciones, scripts, pruebas y
 - Tabla de puertos y flujos:
 
 | Origen | Destino | Puerto | Protocolo | Propósito |
-|---|---|---|---|---|
-| | | | | |
+| ------ | ------- | ------ | --------- | --------- |
+|        |         |        |           |           |
 
 ### 5.5 Dimensionamiento y objetivos de servicio
 
