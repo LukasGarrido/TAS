@@ -6,7 +6,7 @@
 **Paralelo:** 701
 
 **Integrantes:**
-- JoseCarlos Vidal
+- Josecarlos Vidal
 - Octavio Valencia
 - Lukas Garrido
 
