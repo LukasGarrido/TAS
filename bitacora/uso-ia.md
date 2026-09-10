@@ -46,3 +46,12 @@ Documentar el uso de IA generativa en el proyecto, garantizando trazabilidad y v
 - **Salida generada:** Script SQL `CREATE USER 'octavio'@'10.33.199.51' ... GRANT ALL PRIVILEGES`, verificación de `ufw` (inactivo, sin reglas adicionales necesarias) y comando de prueba de conexión (`mysql -h 10.33.199.53 -u octavio -p octavio_bd`) a ejecutar desde la VM `octavio`.
 - **Validación:** Prueba de conexión desde la VM `octavio` , validando con  `SHOW TABLES;` 
 - **Decisión:**  Se aceptaron los scripts
+
+## Asistencia de Claude (diagnóstico de resolución DNS y acceso remoto a `tas-06.arpa`)
+ 
+- **Fecha:** 2026-09-10
+- **Actividad:** Diagnosticar y resolver el fallo de acceso al sitio WordPress alojado en `tas-06.arpa`, accedido desde una máquina Windows conectada por VPN (WatchGuard) hacia la VM Linux `octavio`.
+- **Entrada a la IA:** Reporte de error inicial (`curl: Could not resolve host`), seguido de salidas sucesivas de diagnóstico (`cat /etc/resolv.conf`, `resolvectl status`, `ip addr show`, `ip route show`, `ipconfig /all`, `nslookup`) a medida que se solicitaba orientación paso a paso.
+- **Salida generada:** Explicación de la causa raíz (nombre `tas-06.arpa` resoluble solo contra el DNS interno del laboratorio, no contra el DNS institucional usado por la VPN en Windows), comandos de diagnóstico de red y DNS (`resolvectl`, `nslookup`, `ip route add 10.30.248.0/24 via 10.33.199.52 dev ens19`), y la solución final: entrada estática en el archivo `hosts` de Windows (`10.33.195.184 tas-06.arpa`) más uso de `curl.exe -k` para omitir la validación del certificado SSL no coincidente.
+- **Validación:** Se verificó cada paso contra la salida real de los comandos ejecutados por el usuario (`nslookup` confirmando la IP `10.33.195.184`; `curl.exe -k https://tas-06.arpa` accediendo correctamente al sitio).
+- **Decisión:** Se aplicó la entrada en el archivo `hosts` de Windows y se adoptó `curl.exe -k` como método de verificación de acceso al sitio desde esa máquina.
