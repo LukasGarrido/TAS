@@ -115,22 +115,64 @@ Evaluación de alternativas para el proyecto, comparando WordPress frente a Joom
 - Al ser PHP + MySQL, es totalmente compatible con la arquitectura de referencia del enunciado (backend web + base de datos separada).
 
 ### 5.4 Diagrama de despliegue
-- Archivo: `docs/entrega-1/diagrama-despliegue.png`
-- Tabla de puertos y flujos:
+- Archivo: `docs/entrega-1/diagrama-despliegue.png` / `docs/entrega-1/Diagrama de despliegue.md`
+- Subred de infraestructura: `10.33.199.48/29` (red: .48 · gateway: .52 · broadcast: .55 · host usables: .49–.54)
+- Dominio interno: `tas-06.arpa`
 
-| Origen | Destino | Puerto | Protocolo | Propósito |
-| ------ | ------- | ------ | --------- | --------- |
-|        |         |        |           |           |
+```mermaid
+flowchart LR
+    cliente(["Cliente"])
+
+    subgraph PERIM["Nodo perimetral — 10.33.199.49 · ip pública 10.33.195.184"]
+        direction LR
+        dns(["DNS<br/>puerto 53"])
+        nginx(["NGINX<br/>puerto 80"])
+        dns -.->|flujo interno| nginx
+    end
+
+    subgraph CMS1["WordPress CMS 1 — 10.33.199.51<br/>ip pública 10.33.196.212"]
+        cms1(["CMS<br/>puerto 80"])
+    end
+
+    subgraph CMS2["WordPress CMS 2 — 10.33.199.50"]
+        cms2(["CMS<br/>puerto 80"])
+    end
+
+    subgraph DBSQL["MySQL — 10.33.199.53"]
+        db(["DB<br/>puerto 3306"])
+    end
+
+    cliente -->|"http://tas-06.arpa/"| dns
+    nginx -->|"http://10.33.199.51/"| cms1
+    nginx -->|"http://10.33.199.50/"| cms2
+    cms1 -->|"tcp://10.33.199.53"| db
+    cms2 -->|"tcp://10.33.199.53"| db
+
+    linkStyle 0 stroke:#2e9e3f,stroke-width:2px
+    linkStyle 2,3,4,5 stroke:#2166ac,stroke-width:2px
+```
+
+
+**Tabla de puertos y flujos:**
+
+| Origen          | Destino                                    | Puerto | Protocolo   | Propósito                                                                      |
+| --------------- | ------------------------------------------ | ------ | ----------- | ------------------------------------------------------------------------------ |
+| Cliente         | DNS (nodo perimetral, 10.33.195.184 / .49) | 53     | DNS/UDP-TCP | Resolución del dominio `tas-06.arpa`                                           |
+| Cliente         | Nginx (mismo nodo perimetral, .49)         | 80     | HTTP/TCP    | Acceso público al sitio; DNS y Nginx corren en el mismo host (flujo interno)   |
+| Nginx           | WordPress CMS 1 (10.33.199.51)             | 80     | HTTP/TCP    | Reenvío de tráfico por red privada (upstream 1)                                |
+| Nginx           | WordPress CMS 2 (10.33.199.50)             | 80     | HTTP/TCP    | Reenvío de tráfico por red privada (upstream 2)                                |
+| WordPress CMS 1 | MySQL DB (10.33.199.53)                    | 3306   | TCP         | Consultas a la base de datos, solo por red privada                             |
+| WordPress CMS 2 | MySQL DB (10.33.199.53)                    | 3306   | TCP         | Consultas a la base de datos, solo por red privada                             |
+| Administrador   | Nodo DNS/Nginx, CMS 1, CMS 2, DB           | 22     | SSH/TCP     | Administración remota nominativa (RNF-04), a implementar sobre las IP privadas |
 
 ### 5.5 Dimensionamiento y objetivos de servicio
-
-| Indicador | Meta propuesta | Justificación |
-|---|---|---|
-| Disponibilidad mensual | ≥ 99,5% | |
-| Detección de falla crítica | ≤ 5 min | |
-| RTO servicio web | ≤ 60 min | |
-| RPO general | ≤ 24 h | |
-| Retención de respaldos | ≥ 30 días | |
+| Indicador                  | Meta propuesta | Justificación                                                                                                |
+| -------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------ |
+| Disponibilidad mensual     | ≥ 99,5%        | Con dos backends WordPress detrás de Nginx, una caída de un CMS no debería tumbar el servicio completo       |
+| Detección de falla crítica | ≤ 5 min        | Evita repetir el incidente de 2h sin diagnóstico que originó el proyecto                                     |
+| RTO servicio web           | ≤ 60 min       | Campaña de difusión no puede quedar caída más de 1h sin impacto comercial                                    |
+| RPO general                | ≤ 24 h         | Aceptable en operación normal; a mejorar durante campañas con backups más frecuentes de la BD (10.33.199.53) |
+| Retención de respaldos     | ≥ 30 días      | Cubre detección tardía de errores; ya existe script de respaldo de BD (`octavio_bd_backup.sql`) como base    |
 
 **Puntos únicos de falla identificados:**
 -
@@ -139,25 +181,24 @@ Evaluación de alternativas para el proyecto, comparando WordPress frente a Joom
 -
 
 ### 5.6 Modelo de acceso, seguridad y operación
-- **Accesos remotos:**
-- **Gestión de secretos:**
-- **Firewall / segmentación:**
-- **Logs y monitorización (diseño):**
-- **Backup (diseño):**
-- **Respuesta a incidentes (diseño):**
+- **Accesos remotos:** SSH por clave pública hacia las IP privadas de cada nodo (10.33.199.49/50/51/53), usuario nominativo por integrante, sin cuentas compartidas.
+- **Gestión de secretos:** contraseñas y credenciales fuera del repositorio (ver `script_DB.md`, donde ya se sanitizó con `<hidden_password>`); usar variables de entorno o archivo `.env` ignorado por git.
+- **Firewall / segmentación:** solo el nodo DNS/Nginx (10.33.199.49) expone el puerto 80/443 hacia la red pública, el puerto 3306 de la BD (10.33.199.53) se restringe únicamente a las IP privadas .50 y .51. 
+- **Logs y monitorización (diseño):** logs de acceso/error de Nginx, logs de PHP-FPM en ambos backends, slow query log de MySQL.
+- **Backup (diseño):** dump programado de la base de datos (ya existe script base `octavio_bd_backup.sql`) más respaldo de `wp-content` (archivos/media) de ambos backends.
+- **Respuesta a incidentes (diseño):**  detectar → contener → diagnosticar → corregir → validar → documentar → revertir
 
 ### 5.7 Plan de implementación por etapas
 
-| Etapa     | Entregable        | Pruebas previstas | Responsable(s) |
-| --------- | ----------------- | ----------------- | -------------- |
-| Entrega 2 | CMS montado en Vm |                   |                |
-| Entrega 3 |                   |                   |                |
-| Entrega 4 |                   |                   |                |
-| Entrega 5 |                   |                   |                |
-
+| Etapa     | Entregable                                                                                            | Pruebas previstas                                                                         | Responsable(s) |
+| --------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | -------------- |
+| Entrega 2 | WordPress + Nginx + PHP-FPM + MySQL funcionando en un primer nodo (según `script_cms.md`)             | Resolución DNS de `tas-06.arpa`, acceso HTTP, flujo de compra/reserva end-to-end          |                |
+| Entrega 3 | Segundo backend WordPress (10.33.199.50) + balanceo real vía Nginx upstream + persistencia compartida | Distribución de tráfico entre CMS 1 y CMS 2, retiro de un backend, prueba de persistencia |                |
+| Entrega 4 | Monitoreo, alertas y backups automatizados con restauración medida                                    | Degradación controlada, alerta recibida, restauración con RPO/RTO real                    |                |
+| Entrega 5 | Incidente no anunciado + auditoría final                                                              | Recuperación validada, defensa individual                                                 |                |
 ### 5.8 Evidencias mínimas — checklist
 
-- [ ] Matriz requisito → componente → prueba → evidencia
+- [x] Matriz requisito → componente → prueba → evidencia
 - [ ] Diagrama legible y tabla de flujos/puertos
 - [ ] Registro de decisiones de arquitectura (mínimo 2 alternativas comparadas)
 - [ ] Inventario preliminar de VMs, CPU, RAM, disco, redes y dependencias
