@@ -4,17 +4,21 @@
     "type": "split",
     "children": [
       {
-        "id": "d218845932f5a202",
+        "id": "8e3e77022684e2f7",
         "type": "tabs",
         "children": [
           {
-            "id": "bcec3fdf6622f587",
+            "id": "730ab6665a8472a0",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {},
+              "type": "markdown",
+              "state": {
+                "file": "bitacora/uso-ia.md",
+                "mode": "source",
+                "source": false
+              },
               "icon": "lucide-file",
-              "title": "Nueva pestaña"
+              "title": "uso-ia"
             }
           }
         ]
@@ -184,15 +188,20 @@
       "bases:Crear nueva base": false
     }
   },
-  "active": "bcec3fdf6622f587",
+  "active": "730ab6665a8472a0",
   "lastOpenFiles": [
-    "infraestructura/inventario.md",
-    "scripts/script_dns.md",
-    "scripts/script_db.md",
-    "scripts/script_cms.md",
-    "scripts/script_cms (1).md",
-    "scripts/script1.md",
+    "docs/Proyecto_Integrador_TAS_2026_Nodo_Sur.pdf",
+    "bitacora/uso-ia.md",
+    "bitacora/bitacora-general.md",
+    "bitacora/@uso-ia.md",
+    "docs/entrega-1/Proyecto_Integrador_TAS_2026_Req. Entrega 1.pdf",
+    "evidencias/evidencia1.md",
     "README.md",
-    "docs/Proyecto_Integrador_TAS_2026_Nodo_Sur.pdf"
+    "scripts/script_db.md",
+    "scripts/script_dns.md",
+    "scripts/script_cms.md",
+    "infraestructura/inventario.md",
+    "scripts/script_cms (1).md",
+    "scripts/script1.md"
   ]
 }
