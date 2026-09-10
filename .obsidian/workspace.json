@@ -4,21 +4,33 @@
     "type": "split",
     "children": [
       {
-        "id": "9f62beb360c448f1",
+        "id": "78bd0a9c6fef9f7d",
         "type": "tabs",
         "children": [
           {
-            "id": "623d534407caa187",
+            "id": "b4ee2632c7a1f5a4",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "infraestructura/Inventario preliminar de infraestructura.md",
+                "file": "README.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Inventario preliminar de infraestructura"
+              "title": "README"
+            }
+          },
+          {
+            "id": "26eacda9513009db",
+            "type": "leaf",
+            "state": {
+              "type": "pdf",
+              "state": {
+                "file": "docs/Proyecto_Integrador_TAS_2026_Nodo_Sur.pdf"
+              },
+              "icon": "lucide-file-text",
+              "title": "Proyecto_Integrador_TAS_2026_Nodo_Sur"
             }
           }
         ]
@@ -83,7 +95,8 @@
       }
     ],
     "direction": "horizontal",
-    "width": 200
+    "width": 200,
+    "collapsed": true
   },
   "right": {
     "id": "8386ced3fdc6a344",
@@ -188,22 +201,25 @@
       "bases:Crear nueva base": false
     }
   },
-  "active": "623d534407caa187",
+  "active": "b4ee2632c7a1f5a4",
   "lastOpenFiles": [
+    "docs/Proyecto_Integrador_TAS_2026_Nodo_Sur.pdf",
+    "README.md",
+    "docs/entrega-1/E1_grupo06_informe.docx",
+    "docs/E1_grupo06_informe.docx",
+    "E1_grupo06_informe.docx",
+    "bitacora/uso-ia.md",
+    "scripts/script_db.md",
+    "infraestructura/Inventario preliminar de infraestructura.md",
     "decisiones/ADR-002 Nginx como balanceador en vez de HAProxy.md",
     "decisiones/ADR-001 Selección de CMS.md",
     "evidencias/evidencia1.md",
-    "infraestructura/Inventario preliminar de infraestructura.md",
-    "README.md",
     "docs/entrega-1/diagrama-despliegue.png",
     "docs/entrega-1/Diagrama de despliegue.md",
-    "docs/Proyecto_Integrador_TAS_2026_Nodo_Sur.pdf",
     "Sin título.md",
-    "scripts/script_db.md",
     "scripts/script_dns.md",
     "scripts/script_cms.md",
     "bitacora/bitacora-general.md",
-    "bitacora/uso-ia.md",
     "bitacora/@uso-ia.md",
     "docs/entrega-1/Proyecto_Integrador_TAS_2026_Req. Entrega 1.pdf",
     "scripts/script_cms (1).md",
