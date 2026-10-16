@@ -23,13 +23,13 @@ Para lograr esto, el equipo (JoseCarlos, Octavio, Lukas), deberán actuar como u
 
 ## 2. Estado del proyecto
 
-| Entrega | Hito                                     | Estado       | Fecha |
-| ------- | ---------------------------------------- | ------------ | ----- |
-| 1       | Informe de requerimientos y arquitectura | 🔲 En curso  | 05/09 |
-| 2       | Plataforma base y CMS funcional          | 🔲 Pendiente |       |
-| 3       | Publicación resiliente y seguridad       | 🔲 Pendiente |       |
-| 4       | Observabilidad y continuidad operacional | 🔲 Pendiente |       |
-| 5       | Incidente, auditoría y defensa final     | 🔲 Pendiente |       |
+| Entrega | Hito                                     | Fecha |
+| ------- | ---------------------------------------- | ----- |
+| 1       | Informe de requerimientos y arquitectura | 05/09 |
+| 2       | Plataforma base y CMS funcional          | 05/09 |
+| 3       | Publicación resiliente y seguridad       | 23/09 |
+| 4       | Observabilidad y continuidad operacional |       |
+| 5       | Incidente, auditoría y defensa final     |       |
 
 ---
 
@@ -58,7 +58,7 @@ nodo-sur/
     └── uso-ia.md
 ```
 
-> _La arquitectura esta sujeta a cambios hasta fin de la entrega 1  (ojala xd)_
+> _La arquitectura esta sujeta a cambios hasta fin de la entrega 1 
 
 ---
 

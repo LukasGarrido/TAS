@@ -11,10 +11,14 @@
             "id": "142e5fffc868e8e0",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {},
+              "type": "markdown",
+              "state": {
+                "file": "README.md",
+                "mode": "source",
+                "source": false
+              },
               "icon": "lucide-file",
-              "title": "Nueva pestaña"
+              "title": "README"
             }
           }
         ]
@@ -186,6 +190,7 @@
   },
   "active": "142e5fffc868e8e0",
   "lastOpenFiles": [
+    "docs/entrega-1/~$_grupo06_informe.docx",
     "scripts/script_cms.md",
     "infraestructura/Inventario preliminar de infraestructura.md",
     "decisiones/ADR-001 Selección de CMS.md",
