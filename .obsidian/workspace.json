@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "0e0d2ccd56480509",
+        "id": "d328ed1f04cdc5b1",
         "type": "tabs",
         "children": [
           {
-            "id": "2ab0913bf9d4da9e",
+            "id": "e8bddb2d4cdbaaa6",
             "type": "leaf",
             "state": {
               "type": "empty",
@@ -79,8 +79,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 200,
-    "collapsed": true
+    "width": 200
   },
   "right": {
     "id": "8386ced3fdc6a344",
@@ -185,7 +184,7 @@
       "bases:Crear nueva base": false
     }
   },
-  "active": "2ab0913bf9d4da9e",
+  "active": "e8bddb2d4cdbaaa6",
   "lastOpenFiles": [
     "README.md",
     "docs/entrega-1/~$_grupo06_informe.docx",
