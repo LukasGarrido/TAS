@@ -1,10 +1,14 @@
 
-> Subred de infraestructura: `10.33.199.48/29` (red: .48 · gateway: .52 · broadcast: .55 · host usables: .49–.54) Dominio interno: `tas-06.arpa`
->
+## Nodos - máquinas virtuales
 
-| VM/Host         | Rol                                                    | IP privada   | IP pública    | CPU | RAM | Disco | Red                                                          | Dependencias                     |
-| --------------- | ------------------------------------------------------ | ------------ | ------------- | --- | --- | ----- | ------------------------------------------------------------ | -------------------------------- |
-| Nodo perimetral | DNS (puerto 53) + Nginx (puerto 80), proxy/balanceador | 10.33.199.49 | 10.33.195.184 |     |     |       | Pública + privada                                            | WordPress CMS 1, WordPress CMS 2 |
-| WordPress CMS 1 | Backend web (Nginx + PHP-FPM + WordPress), puerto 80   | 10.33.199.51 | 10.33.196.212 |     |     |       | Privada (con salida pública directa a corregir, ver riesgos) | MySQL DB                         |
-| WordPress CMS 2 | Backend web (Nginx + PHP-FPM + WordPress), puerto 80   | 10.33.199.50 | —             |     |     |       | Privada                                                      | MySQL DB                         |
-| MySQL DB        | Base de datos (MySQL/MariaDB), puerto 3306             | 10.33.199.53 | —             |     |     |       | Privada, solo accesible desde .50 y .51                      | Backend 1, Backend 2             |
+| VM (hostname)    | Nodo    | Rol                        | IP privada   | Servicios                  |
+| ---------------- | ------- | -------------------------- | ------------ | -------------------------- |
+| `tas-06-jose`    | DNS     | DNS y balanceador de carga | 10.33.199.49 | DNS (53), Nginx (80/443)   |
+| `tas-06-02`      | CMS 1   | CMS principal              | 10.33.199.51 | WordPress                  |
+| `tas-06-cms-02`  | CMS 2   | CMS, segunda réplica       | 10.33.199.50 | WordPress                  |
+| `tas-06-monitor` | Monitor | Monitorización             | 10.33.199.52 | Grafana - Prometheus       |
+| `tas-06-****`    | DB      | Base de datos              | 10.33.199.53 | MariaDB (contenedor, 3306) |
+
+### Gestión de credenciales
+
+Las credenciales de las máquinas se resguardan en variables de entorno (archivo `.env` excluido del repositorio con `.gitignore`). 
