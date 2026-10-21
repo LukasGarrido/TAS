@@ -1,11 +1,8 @@
 # Nodo Sur — Plataforma digital resiliente
 
 **Asignatura:** EIN-090B · Taller de Administración de Sistemas
-**Proyecto integrador 2026**
-**Grupo:** 6
-**Paralelo:** 701
 
-**Integrantes:**
+**Colaboradores:**
 - Josecarlos Vidal
 - Octavio Valencia
 - Lukas Garrido
