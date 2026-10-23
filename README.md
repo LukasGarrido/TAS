@@ -96,7 +96,7 @@ Este repositorio contiene la documentación, configuraciones, scripts, pruebas y
 | Backend web (CMS 1 o CMS 2) | Caída de un nodo | Sin impacto si el otro absorbe la demanda, si no la absorbe, degradación o interrupción de ventas durante la campaña | RNF-01 |
 | Flujo de reserva con cupos | Escritura duplicada o perdida | Doble reserva o cupo perdido (caso de las solicitudes duplicadas del incidente piloto) | RF-01 |
 | Respaldos | Backup antiguo o nunca restaurado | Pérdida de semanas de datos y recuperación incierta (caso del respaldo sin probar) | RNF-06 |
-| Credenciales administrativas | Compartidas, expuestas o sin revocación | Acceso indefinido de personas que ya no deberían tenerlo, sin trazabilidad | RNF-04 |
+| Credenciales administrativas | Compartidas, débiles, expuestas o sin revocación | Acceso indefinido de personas que ya no deberían tenerlo, sin trazabilidad | RNF-04 |
 | Monitorización y logs | Ausencia de métricas y alertas | Fallas de horas sin diagnóstico (caso del formulario caído casi dos horas) | RNF-05, RNF-08 |
 
 ### 5.2 Requerimientos
@@ -113,7 +113,7 @@ Cada requerimiento incluye un umbral medible y una prueba. Instalar el servicio 
 | RNF-05 | Detección de falla crítica en tiempo acotado | No funcional | Alerta de Alertmanager recibida en ≤ 5 min tras detener un backend, sin observar un panel | Detener un servicio y medir el tiempo entre el evento y la recepción de la alerta en el canal definido |
 | RNF-06 | Continuidad mediante respaldos verificados | No funcional | Retención ≥ 30 días; restauración completa en ≤ 60 min con pérdida de datos ≤ 24 h | Restaurar en una VM de prueba y medir tiempos y datos recuperados (Entrega 4) |
 | RNF-07 | Publicación bajo un dominio único con HTTPS válido | No funcional | `https://tas-06.arpa` responde sin error de certificado y HTTP en el 80 redirige a HTTPS | `curl -v` y `openssl s_client` desde un cliente |
-| RNF-08 | Trazabilidad y hora consistente en logs | No funcional | Desfase entre nodos ≤ 1 s; un evento puede reconstruirse correlacionando logs de proxy, web, BD y SSH | Comparar `chronyc tracking` en todos los nodos y seguir una solicitud entre logs (consulta en Loki) |
+| RNF-08 | Trazabilidad y hora consistente en logs | No funcional | Desfase entre nodos ≤ 1 s y misma zona horaria en VM y contenedores; un evento puede reconstruirse correlacionando logs de proxy, web, BD y SSH | Comparar `chronyc tracking` y `date` en todos los nodos y seguir una solicitud entre logs (consulta en Loki) |
 
 ### 5.3 Selección de CMS y suite
 
@@ -126,7 +126,7 @@ Evaluación de alternativas para el proyecto, comparando WordPress frente a Joom
 | **Curva de operación** | Baja, adecuada para personal sin equipo técnico | Media, requiere entender su estructura de artículos, categorías y menús, más rígida que WordPress | Alta, requiere conocimientos técnicos serios (arquitectura de contenidos, módulos, a veces Drush/CLI) |
 | **Recursos** | Imagen oficial `wordpress:php8.3-apache` en contenedor y MariaDB 11. 2 vCPU / 2 GB por backend es una base razonable para el volumen esperado, a validar con prueba de carga | Pila PHP + MySQL/MariaDB con requisitos comparables a WordPress | Pila similar, pero con Commerce y módulos a medida el consumo y el tuning requeridos son mayores |
 | **Mantenimiento** | Parches frecuentes del núcleo; el mayor riesgo está en los plugins de terceros. Política: actualizar primero en pruebas, limitar la cantidad de plugins, deshabilitar la edición de archivos desde el panel y fijar versiones de imagen | Actualizaciones mayores más exigentes y extensiones con ciclos de soporte desiguales | Actualizaciones mayores costosas; requiere personal con conocimiento técnico para mantenerlo |
-| **Compatibilidad** | Compatible con Docker, MariaDB y NFS, WooCommerce exige una versión mínima de WordPress y PHP, el plugin de reservas debe validarse con dos nodos | Compatible con la pila, pero e-commerce y reservas dependen de extensiones poco integradas | Compatible con la pila, e-commerce requiere Drupal Commerce y desarrollo a medida |
+| **Compatibilidad** | Compatible con Docker, MariaDB y NFS; WooCommerce exige una versión mínima de WordPress y PHP; el plugin de reservas debe validarse con dos nodos | Compatible con la pila, pero e-commerce y reservas dependen de extensiones poco integradas | Compatible con la pila; e-commerce requiere Drupal Commerce y desarrollo a medida |
 | **Límites conocidos / de operación** | Es *stateful* (uploads en disco), por lo que con dos nodos exige resolver la coherencia de archivos. `wp-cron` se dispara por visita y con dos nodos se ejecuta por duplicado (se resuelve con un cron del sistema en un solo nodo). `admin-ajax` carga bajo tráfico alto. Rendimiento sensible a plugins; requiere caché | No tiene un módulo de e-commerce/reservas tan maduro como WooCommerce; VirtueMart o HikaShop son menos pulidas | No tiene e-commerce/reservas nativo; requiere Drupal Commerce y trabajo de desarrollo a medida; mantenimiento más costoso |
 | **Motivo de descarte** | — | El caso necesita catálogo, cupos y venta directa; hacerlo funcionar en Joomla implica sumar extensiones de terceros poco integradas entre sí, agregando fragilidad sin beneficio real sobre WordPress | Drupal está pensado para sitios complejos con lógica de contenido avanzada, no para una tienda con reservas simple; usarlo exigiría un equipo de desarrollo dedicado, contradiciendo la necesidad de operación con personal sin equipo técnico |
 
@@ -143,7 +143,8 @@ Evaluación de alternativas para el proyecto, comparando WordPress frente a Joom
 - Subred de infraestructura: `10.33.199.48/29` (red: .48 · broadcast: .55 · host usables: .49–.54; el .54 está libre)
 - Dominio interno: `tas-06.arpa`
 - Todos los servicios corren en contenedores Docker (ver `scripts/01_docker.md`).
-- Estado actual: el CMS 1 mantiene una IP pública (10.33.196.212), el monitor tiene una IP pública temporal (10.33.195.245) y el puerto 8080 de los backends se publica en todas las interfaces. Estos puntos se corrigen en las Entregas 2 y 3 (ver *Acceso directo a backends*).
+- Estado actual: además del nodo perimetral, las otras cuatro VM (CMS 1, CMS 2, monitor y base de datos) tienen una segunda tarjeta de red con IP pública (10.33.195.212, .193, .245 y .178). El diseño objetivo es que solo el nodo perimetral conserve dos tarjetas y el resto quede con una sola, la privada. Hasta entonces, el puerto 8080 de los backends se publica en todas las interfaces (ver *Acceso directo a backends*).
+- Decisión pendiente: con una sola tarjeta, esas VM no tendrán salida a internet (`apk`, `docker pull`) salvo que el nodo perimetral haga NAT. Debe decidirse antes de retirar las tarjetas.
 
 ```mermaid
 flowchart LR
@@ -155,20 +156,20 @@ flowchart LR
         nginx(["NGINX<br/>puertos 80 y 443<br/>exporter :9113"])
     end
 
-    subgraph CMS1["tas-06-02 · WordPress CMS 1<br/>10.33.199.51 · ip pública 10.33.196.212"]
+    subgraph CMS1["tas-06-02 · WordPress CMS 1<br/>10.33.199.51 · ip pública 10.33.195.212"]
         cms1(["WordPress (contenedor)<br/>puerto 8080<br/>exporter :9117"])
     end
 
-    subgraph CMS2["tas-06-cms-02 · WordPress CMS 2<br/>10.33.199.50"]
+    subgraph CMS2["tas-06-cms-02 · WordPress CMS 2<br/>10.33.199.50 · ip pública 10.33.195.193"]
         cms2(["WordPress (contenedor)<br/>puerto 8080<br/>exporter :9117"])
     end
 
-    subgraph DBN["tas-06-**** · Base de datos y archivos<br/>10.33.199.53"]
+    subgraph DBN["tas-06-lukas · Base de datos y archivos<br/>10.33.199.53 · ip pública 10.33.195.178"]
         db(["MariaDB (contenedor)<br/>puerto 3306"])
         nfs(["Servidor NFS<br/>puerto 2049"])
     end
 
-    subgraph MON["tas-06-monitor · Monitorización<br/>10.33.199.52"]
+    subgraph MON["tas-06-monitor · Monitorización<br/>10.33.199.52 · ip pública 10.33.195.245"]
         mon(["Prometheus · Alertmanager<br/>Loki · Grafana"])
     end
 
@@ -206,7 +207,8 @@ flowchart LR
 | Monitor (.52) | MariaDB (.53) | 3306 | TCP | `mysqld-exporter` con usuario de solo métricas |
 | Monitor (.52) | Nodo perimetral (.49) | 9113 | HTTP/TCP | Métricas de Nginx (`nginx-prometheus-exporter`) |
 | Monitor (.52) | CMS 1 y CMS 2 (.51 y .50) | 9117 | HTTP/TCP | Métricas de Apache (`apache-exporter`) |
-| Administrador | Todos los nodos (IP privadas) | 22 | SSH/TCP | Administración remota nominativa por clave pública (RNF-04) y túnel hacia el monitor |
+| Administrador | Nodo perimetral (IP pública .184) | 22 | SSH/TCP | Único punto de entrada administrativo (bastión) |
+| Nodo perimetral (.49) | CMS 1, CMS 2, monitor y BD (IP privadas) | 22 | SSH/TCP | Administración remota nominativa por clave pública (RNF-04), con salto (`ssh -J`) desde el bastión |
 | Todos los nodos | Fuente NTP | 123 | UDP | Sincronización horaria (RNF-08) |
 
 El canal de estadísticas de BIND9 (`127.0.0.1:8053`) está habilitado, pero aún no tiene exporter hacia Prometheus.
@@ -233,13 +235,13 @@ El NFS se aloja en la VM de la base de datos, y no en un nodo propio, por simpli
 
 Además, Nginx no reintenta por defecto solicitudes no idempotentes (POST). Un pedido que falla a mitad de camino no se reenvía al otro backend: se evita duplicarlo, pero ese cliente ve el error. Como complemento, Prometheus recolecta el estado de Nginx, Apache y MariaDB, y se incorporará un script con `curl` a un endpoint de salud de cada backend (verifica también la conexión a la BD), ejecutado por cron y con alerta.
 
-**Acceso directo a backends.** Los backends no deben poder eludir los controles del punto de entrada. Hoy el puerto 8080 se publica en todas las interfaces y el CMS 1 conserva una IP pública, por lo que un cliente podría saltarse Nginx. Controles:
+**Acceso directo a backends.** Los backends no deben poder eludir los controles del punto de entrada. Hoy el puerto 8080 se publica en todas las interfaces y las VM de CMS, monitor y base de datos tienen una IP pública, por lo que un cliente podría saltarse Nginx. Controles:
+- Dejar cada VM con una sola tarjeta de red (la privada) y retirar las IP públicas de CMS 1, CMS 2, monitor y base de datos; solo el nodo perimetral conserva dos tarjetas.
 - Publicar el puerto 8080 solo en la IP privada de cada backend y aceptar únicamente a 10.33.199.49 (y el 9117 solo a 10.33.199.52).
 - Docker inserta sus propias reglas de iptables y se salta el firewall del host, por lo que la restricción debe aplicarse también en la cadena `DOCKER-USER`.
-- Retirar la IP pública del CMS 1 (E2) y del monitor al terminar su configuración.
 - Nginx incluye un `server` por defecto que rechaza Hosts desconocidos, y los backends usan `set_real_ip_from 10.33.199.49` para registrar la IP real del cliente.
-- SSH solo desde la red de administración.
-- Prueba de aceptación: `curl http://10.33.196.212:8080` desde fuera debe fallar y `curl http://10.33.199.51:8080` desde un origen distinto de .49 debe ser rechazado.
+- SSH solo desde el nodo perimetral, que actúa como bastión.
+- Prueba de aceptación: `curl http://10.33.195.212:8080` desde fuera debe fallar y `curl http://10.33.199.51:8080` desde un origen distinto de .49 debe ser rechazado.
 
 El tráfico entre el nodo perimetral y los backends viaja sin cifrar dentro de la subred privada; se acepta como riesgo residual para este alcance.
 
@@ -273,7 +275,7 @@ Cálculo de referencia (supuestos ilustrativos que deben reemplazarse con las me
 Si el pico proyectado supera la capacidad de un backend, se aplican medidas de degradación controlada: caché de página, `limit_req` en Nginx para proteger el checkout y suspensión de tareas no críticas.
 
 **Puntos únicos de falla identificados:**
-- **Nodo perimetral (10.33.199.49):** concentra DNS y Nginx; su caída interrumpe la resolución del dominio y la distribución de tráfico.
+- **Nodo perimetral (10.33.199.49):** concentra DNS y Nginx, su caída interrumpe la resolución del dominio y la distribución de tráfico. Además, con las VM en una sola tarjeta, es el único camino de administración (bastión).
 - **VM de la base de datos (10.33.199.53):** aloja MariaDB (instancia única sin réplica) y el servidor NFS; una falla elimina datos y archivos a la vez, y ambos backends quedan inoperantes aunque sigan activos.
 - **VM de monitorización (10.33.199.52):** única; su caída deja sin observabilidad ni alertas, pero no interrumpe el servicio.
 - **Infraestructura de virtualización y red de laboratorio:** dependencia compartida por todos los nodos, no controlada por el equipo.
@@ -287,12 +289,13 @@ Si el pico proyectado supera la capacidad de un backend, se aplican medidas de d
 
 ### 5.6 Modelo de acceso, seguridad y operación
 
-- **Accesos remotos:** SSH por clave pública hacia las IP privadas de cada nodo (10.33.199.49 a .53), usuario nominativo por integrante, `PasswordAuthentication no`, `PermitRootLogin no`, `sudo` limitado y sin cuentas compartidas. Revocación individual eliminando la clave del usuario. Pertenecer al grupo `docker` equivale a tener acceso root, por lo que se limita a quienes administran los servicios.
+- **Accesos remotos:** SSH por clave pública hacia las IP privadas de cada nodo (10.33.199.49 a .53), con salto por el nodo perimetral (`ssh -J <usuario>@10.33.195.184 <usuario>@<IP privada>`), usuario nominativo por integrante, `PasswordAuthentication no`, `PermitRootLogin no`, `sudo` limitado y sin cuentas compartidas. Revocación individual eliminando la clave del usuario. Pertenecer al grupo `docker` equivale a tener acceso root, por lo que se limita a quienes administran los servicios. Estado actual: las VM usan cuentas `root` y de servicio con contraseña, que deben reemplazarse por usuarios nominativos con clave antes de dar por cumplido RNF-04.
 - **Gestión de secretos:** contraseñas y credenciales fuera del repositorio. Se guardan en archivos `.env` (MariaDB, Grafana) y `.my.cnf` (exporter de MariaDB) con permisos `600`, ignorados por git; el repositorio solo versiona `.env.example` con valores de referencia (`<hidden_password>`). El `wp-config.php`, que contiene la contraseña de la BD, se comparte por NFS con acceso restringido a los backends. Si un secreto se expone, se rota de inmediato.
-- **Firewall / segmentación:** solo el nodo perimetral expone 53, 80 y 443 hacia la red pública. Los backends aceptan el 8080 solo desde .49; la BD acepta el 3306 solo desde .50, .51 y .52; el NFS acepta el 2049 solo desde .50 y .51; el SSH solo desde la red de administración. Política por defecto: denegar, aplicando las reglas también en `DOCKER-USER`.
-- **Logs y monitorización:** la VM de monitorización ejecuta Prometheus, Alertmanager, Loki y Grafana en contenedores, con puertos publicados solo en `127.0.0.1` y acceso por túnel SSH (`AllowTcpForwarding local`). Se recolectan métricas de Nginx, Apache y MariaDB mediante exporters; el exporter de BIND9 está pendiente. Retención de 7 días para métricas y logs. Logs de acceso y error de Nginx y Apache, slow query log de MariaDB y `auth.log` para SSH; NTP en todos los nodos para correlacionar eventos. Procedimientos: `scripts/02_monitor_vm.md`, `05_monitoreo_nginx_bind.md` y `06_monitoreo_mariadb.md`.
+- **Firewall / segmentación:** solo el nodo perimetral expone 53, 80 y 443 (y el SSH como bastión) hacia la red pública. Los backends aceptan el 8080 solo desde .49; la BD acepta el 3306 solo desde .50, .51 y .52; el NFS acepta el 2049 solo desde .50 y .51; el SSH de los demás nodos solo desde .49. Política por defecto: denegar, aplicando las reglas también en `DOCKER-USER`.
+- **Logs y monitorización:** la VM de monitorización ejecuta Prometheus, Alertmanager, Loki y Grafana en contenedores, con puertos publicados solo en `127.0.0.1` y acceso por túnel SSH (`AllowTcpForwarding local`) a través del bastión. Se recolectan métricas de Nginx, Apache y MariaDB mediante exporters; el exporter de BIND9 está pendiente. Retención de 7 días para métricas y logs. Logs de acceso y error de Nginx y Apache, slow query log de MariaDB y `auth.log` para SSH; NTP y la misma zona horaria en todos los nodos para correlacionar eventos. Procedimientos: `scripts/02_monitor_vm.md`, `05_monitoreo_nginx_bind.md` y `06_monitoreo_mariadb.md`.
 - **Alertas:** Alertmanager agrupa las alertas, pero su receptor aún no tiene destino (correo o webhook), por lo que hoy no llegan a nadie. Es el principal pendiente para cumplir RNF-05.
 - **Backup (diseño):** dump programado de la BD, respaldo de `wp-content/uploads` y de las configuraciones, retención ≥ 30 días, al menos una copia fuera del host de origen y verificación por checksum. Antes de cualquier operación destructiva (`docker compose down -v`) se hace un dump. Restauración probada en la Entrega 4.
+- **Backup (estado actual):** respaldo manual con `mariadb-dump --all-databases` guardado en `/home/database/backups` de la VM de la base de datos (nombre con fecha y hora). El archivo verificado pesa 1,0 MB, termina en `Dump completed` y contiene `mydb` (52 tablas) y `mysql` (30 tablas, con usuarios y permisos). Pendientes: prueba de restauración en un contenedor aparte, copia en el nodo perimetral, automatización con retención de 30 días y respaldo de los archivos del NFS.
 - **Respuesta a incidentes (diseño):** detectar → priorizar → contener → diagnosticar → corregir → validar → documentar → revertir si corresponde. Cada paso queda registrado con hipótesis, evidencia y marcas de tiempo en `bitacora/bitacora-general.md`.
 
 **Política de datos:**
@@ -313,7 +316,7 @@ Responsables propuestos según la distribución actual del trabajo; confirmar en
 
 | Etapa | Entregable | Responsable(s) | Depende de | Pruebas previstas | Criterio para avanzar | Reversión |
 |---|---|---|---|---|---|---|
-| Entrega 2 | Docker en los nodos, MariaDB y WordPress en contenedores, DNS y Nginx, servidor NFS y VM de monitorización; retiro de las IP públicas (según `scripts/01_docker.md` a `04_wordpress.md`) | Octavio (CMS), Lukas (BD y NFS), Josecarlos (DNS y nodo perimetral) | VMs y red listas | Resolución DNS de `tas-06.arpa`, acceso HTTPS por nombre, flujo de compra o reserva, BD inaccesible desde fuera, NFS montado en ambos backends | RF-01, RNF-02 y RNF-07 verificados | Dump de la BD y copia de los compose y de `nginx.conf` antes de cada cambio; `nginx -t` antes de `reload` |
+| Entrega 2 | Docker en los nodos, MariaDB y WordPress en contenedores, DNS y Nginx, servidor NFS y VM de monitorización; CMS 1, CMS 2, monitor y BD con una sola tarjeta de red (según `scripts/01_docker.md` a `04_wordpress.md`) | Octavio (CMS), Lukas (BD y NFS), Josecarlos (DNS y nodo perimetral) | VMs y red listas; decisión sobre salida a internet (NAT) | Resolución DNS de `tas-06.arpa`, acceso HTTPS por nombre, flujo de compra o reserva, BD inaccesible desde fuera, NFS montado en ambos backends, IP públicas sin respuesta | RF-01, RNF-02 y RNF-07 verificados | Dump de la BD y copia de los compose, de `nginx.conf` y de `/etc/network/interfaces` antes de cada cambio; `nginx -t` antes de `reload`; consola del hipervisor como vía de recuperación |
 | Entrega 3 | Balanceo verificado entre ambos backends, script de salud, firewall en `DOCKER-USER` y prueba de capacidad N-1 | Octavio, Lukas, Josecarlos | Entrega 2 y ADR-003 | Distribución entre CMS 1 y CMS 2, retiro de un backend, checksum entre nodos, prueba de carga con un solo backend | RNF-01 y RNF-03 verificados y capacidad de un backend ≥ pico proyectado | Quitar el segundo backend del `upstream` y volver a un solo nodo |
 | Entrega 4 | Alertas con destino, exporter de BIND9, agente de logs hacia Loki, backups automatizados y restauración | Equipo completo | Entrega 3 | Degradación controlada, alerta ≤ 5 min, restauración ≤ 60 min en VM de prueba | RNF-05, RNF-06 y RNF-08 verificados con marcas de tiempo | Restaurar la configuración anterior desde Git |
 | Entrega 5 | Auditoría final e incidente no anunciado | Equipo completo | Entrega 4 | Recuperación validada con el flujo de negocio, defensa individual | Matriz de pruebas completa | Etiqueta de versión estable del repositorio |
@@ -322,7 +325,7 @@ Responsables propuestos según la distribución actual del trabajo; confirmar en
 
 - [x] Matriz requisito → componente → prueba → evidencia (ver tabla siguiente)
 - [x] Diagrama legible y tabla de flujos/puertos
-- [x] Registro de decisiones de arquitectura (ADR-001 y ADR-002)
+- [x] Registro de decisiones de arquitectura (ADR-001 y ADR-002, ADR-003 por redactar)
 - [x] Inventario preliminar de VMs, CPU, RAM, disco, redes y dependencias (sección 6)
 - [x] Riesgos priorizados y tratamiento propuesto (sección 7)
 
@@ -338,7 +341,7 @@ Responsables propuestos según la distribución actual del trabajo; confirmar en
 | RNF-05 | Prometheus + Alertmanager + script de salud | Detener un servicio y medir el tiempo hasta la alerta | Marcas de tiempo del evento y de la alerta |
 | RNF-06 | Backups + VM de prueba | Restauración medida | Tiempos de RPO y RTO reales |
 | RNF-07 | Nginx + certificado TLS | `curl -v` y `openssl s_client` | Salida sin errores de certificado |
-| RNF-08 | NTP + logs (Loki) | `chronyc tracking` y correlación de una solicitud | Desfase ≤ 1 s y secuencia de eventos |
+| RNF-08 | NTP + logs (Loki) | `chronyc tracking`, `date` en cada nodo y correlación de una solicitud | Desfase ≤ 1 s, misma zona horaria y secuencia de eventos |
 
 ---
 
@@ -348,13 +351,13 @@ Los recursos son estimaciones de diseño, salvo los de la VM de monitorización,
 
 | VM/Host | Rol | CPU | RAM | Disco | Red | Dependencias |
 |---|---|---|---|---|---|---|
-| `tas-06-jose` | Nodo perimetral: DNS (BIND9, 53) + Nginx (80/443), punto de entrada | 1 vCPU (estimado) | 1 GB (estimado) | 10 GB (estimado) | 10.33.199.49 · pública 10.33.195.184 | CMS 1, CMS 2, NTP |
-| `tas-06-02` | WordPress CMS 1 (contenedor, 8080) + apache-exporter (9117) | 2 vCPU (estimado) | 2 GB (estimado) | 20 GB (estimado) | 10.33.199.51 · IP pública 10.33.196.212 a retirar en E2 | MariaDB, NFS |
-| `tas-06-cms-02` | WordPress CMS 2 (contenedor, 8080) + apache-exporter (9117) | 2 vCPU (estimado) | 2 GB (estimado) | 20 GB (estimado) | 10.33.199.50 | MariaDB, NFS |
-| `tas-06-****` | MariaDB 11 (contenedor, 3306) + servidor NFS (2049) | 2 vCPU (estimado) | 4 GB (estimado) | Por medir (BD + archivos subidos) | 10.33.199.53 | — |
-| `tas-06-monitor` | Prometheus, Alertmanager, Loki y Grafana (contenedores) + mysqld-exporter | 2 vCPU (real) | 4 GB + 4 GB de swap (real) | 191,6 GB (real) | 10.33.199.52 · IP pública temporal 10.33.195.245 | Exporters de los demás nodos |
+| `tas-06-jose` | Nodo perimetral: DNS (BIND9, 53) + Nginx (80/443), punto de entrada y bastión SSH | 1 vCPU (estimado) | 1 GB (estimado) | 10 GB (estimado) | 10.33.199.49 · pública 10.33.195.184 (se conserva) | CMS 1, CMS 2, NTP |
+| `tas-06-02` | WordPress CMS 1 (contenedor, 8080) + apache-exporter (9117) | 2 vCPU (estimado) | 2 GB (estimado) | 20 GB (estimado) | 10.33.199.51 · IP pública 10.33.195.212 a retirar | MariaDB, NFS |
+| `tas-06-cms-02` | WordPress CMS 2 (contenedor, 8080) + apache-exporter (9117) | 2 vCPU (estimado) | 2 GB (estimado) | 20 GB (estimado) | 10.33.199.50 · IP pública 10.33.195.193 a retirar | MariaDB, NFS |
+| `tas-06-lukas` | MariaDB 11 (contenedor, 3306) + servidor NFS (2049) | 2 vCPU (estimado) | 4 GB (estimado) | 191,7 GB (real); uso actual 1,5 GB | 10.33.199.53 · IP pública 10.33.195.178 a retirar | — |
+| `tas-06-monitor` | Prometheus, Alertmanager, Loki y Grafana (contenedores) + mysqld-exporter | 2 vCPU (real) | 4 GB + 4 GB de swap (real) | 191,6 GB (real) | 10.33.199.52 · IP pública 10.33.195.245 a retirar | Exporters de los demás nodos |
 
-Versiones conocidas: la VM de monitorización usa Alpine Linux 3.24.2, Docker v29.8.1 y Docker Compose v5.1.4. Completar el sistema operativo y las versiones de los demás nodos.
+Versiones conocidas: la VM de monitorización usa Alpine Linux 3.24.2, Docker v29.8.1 y Docker Compose v5.1.4; las VM de CMS y de base de datos usan Alpine Linux. Completar el sistema operativo y las versiones del resto de los nodos. Las IP públicas pertenecen a la red `10.33.195.128/25` del laboratorio.
 
 ---
 
@@ -364,16 +367,17 @@ Versiones conocidas: la VM de monitorización usa Alpine Linux 3.24.2, Docker v2
 |---|---|---|---|
 | Un backend no puede absorber el pico cuando cae el otro | Media | Alto | Criterio N-1 con prueba de carga; ajuste de `MaxRequestWorkers`, caché y `limit_req` |
 | Caída de la VM de la BD (MariaDB y NFS comparten host) | Media | Alto | Declarado como SPOF; backups verificados, y separar el NFS y replicar la BD como evolución |
-| Caída del nodo perimetral (DNS + Nginx en el mismo host) | Media | Alto | Declarado como SPOF; separar DNS y Nginx y evaluar segundo proxy con VRRP |
+| Caída del nodo perimetral (DNS + Nginx en el mismo host y único bastión SSH) | Media | Alto | Declarado como SPOF; separar DNS y Nginx, evaluar segundo proxy con VRRP y mantener la consola del hipervisor como vía de emergencia |
 | Divergencia de plugins entre backends | Media | Medio | `DISALLOW_FILE_MODS` y despliegue desde archivos versionados |
-| Acceso directo a un backend que elude el punto de entrada (puerto 8080 abierto y CMS 1 con IP pública) | Alta | Medio | Publicar en IP privada, restringir en `DOCKER-USER` y retirar la IP pública |
+| Acceso directo a un backend que elude el punto de entrada (puerto 8080 abierto y IP pública en CMS 1, CMS 2, monitor y BD) | Alta | Medio | Dejar cada VM con una sola tarjeta (privada), publicar en IP privada y restringir en `DOCKER-USER` |
 | Endpoints de estado y métricas expuestos (`/server-status`, exporters, BIND9) | Alta | Medio | Restringir `/server-status` a la red interna de Docker, limitar los exporters al origen 10.33.199.52 y dejar BIND9 en `127.0.0.1` |
 | Resolvedor DNS abierto (recursión para cualquier origen) | Alta | Medio | Limitar `allow-recursion` y `allow-query-cache` a 10.33.199.48/29 y verificar `REFUSED` desde fuera |
 | Alertas sin destino: una falla no avisa a nadie | Alta | Alto | Definir el receptor de Alertmanager y regla `up == 0` para todos los jobs |
 | Falla no detectada a tiempo por health checks pasivos | Media | Alto | Script de comprobación activa con alerta y monitorización |
 | Pérdida de datos por una operación destructiva sin respaldo previo | Media | Alto | Dump antes de `docker compose down -v` y backups automatizados |
-| Respaldos sin restauración probada | Media | Alto | Restauración en VM de prueba con medición de RPO y RTO |
-| Credenciales compartidas, expuestas o sin revocación | Media | Alto | SSH nominativo por clave pública, secretos en archivos con permisos 600 fuera del repositorio y rotación inmediata si se exponen |
+| Respaldos solo manuales, en la misma VM y sin restauración probada | Alta | Alto | Prueba de restauración en un contenedor aparte, copia en el nodo perimetral, automatización con retención de 30 días y medición de RPO y RTO |
+| Zonas horarias distintas entre VM y contenedores (el dump registró 23:11 en una VM cuya hora local era 20:11) | Media | Medio | Fijar `TZ` en los contenedores y sincronizar la hora de todos los nodos |
+| Credenciales débiles o compartidas en las cuentas de las VM, alcanzables por IP pública hasta retirar la segunda tarjeta | Alta | Alto | Usuarios nominativos con clave, `PasswordAuthentication no`, `PermitRootLogin no`, cambio inmediato de las contraseñas actuales y secretos fuera del repositorio |
 | Plugins desactualizados o vulnerables | Media | Medio | Política de actualización en pruebas, plugins mínimos e imágenes con etiqueta fija |
 
 ---
@@ -395,6 +399,8 @@ Cada decisión relevante se documenta en `decisiones/ADR-XXX-titulo.md` con este
 |---|---|---|
 | ADR-001 | Selección de CMS: WordPress + WooCommerce frente a Joomla y Drupal | Aprobada |
 | ADR-002 | Nginx como balanceador en vez de HAProxy, con detección pasiva de fallas | Aprobada |
+| ADR-003 | Coherencia de archivos entre backends: NFS alojado en la VM de la BD frente a NFS en nodo propio y a `lsyncd`/`rsync` | Decidida, por redactar |
+
 ---
 
 ## 9. Bitácora de contribuciones por integrante
@@ -413,7 +419,7 @@ Cada integrante registra únicamente actividades respaldadas por evidencia en el
 
 | Herramienta | Propósito | Fragmento relevante | Validación realizada | Cambios aplicados |
 |---|---|---|---|---|
-| Claude | Apoyo en redacción, estructura y corrección del informe, del README y de la documentación de scripts | Tablas de requerimientos con umbrales, política de datos, cálculo de capacidad N-1 y documentación de la configuración de Docker, NFS y monitorización | A completar por el equipo: revisar cada cifra y comando y contrastarlo con pruebas y documentación oficial | A completar por el equipo |
+| Claude | Apoyo en redacción, estructura y corrección del informe, del README y de la documentación de scripts | Tablas de requerimientos con umbrales, política de datos, cálculo de capacidad N-1 y documentación de la configuración de Docker, NFS, monitorización y respaldo | A completar por el equipo: revisar cada cifra y comando y contrastarlo con pruebas y documentación oficial | A completar por el equipo |
 
 _Nota: la respuesta de una IA no constituye evidencia técnica. Todo código o comando debe poder ser explicado por cualquier integrante del equipo._
 
@@ -428,7 +434,8 @@ Los secretos nunca se versionan: cada nodo usa su propio `.env` (con permisos `6
 3. **Backends (10.33.199.51 y .50):** montar el NFS y levantar WordPress con `scripts/04_wordpress.md`.
 4. **Nodo perimetral (10.33.199.49):** DNS y Nginx como balanceador hacia los backends.
 5. **Monitorización (10.33.199.52):** `scripts/02_monitor_vm.md`, y después los exporters con `scripts/05_monitoreo_nginx_bind.md` y `scripts/06_monitoreo_mariadb.md`.
-6. **Verificación:** ejecutar las pruebas de la matriz de trazabilidad (5.8) y guardar la evidencia en `evidencias/`.
+6. **Red:** dejar CMS 1, CMS 2, monitor y BD con una sola tarjeta (la privada), accediendo por salto desde el nodo perimetral.
+7. **Verificación:** ejecutar las pruebas de la matriz de trazabilidad (5.8) y guardar la evidencia en `evidencias/`.
 
 Los scripts `script_cms.md`, `script_db.md` y `script_dns.md` documentan la línea base de instalación tradicional, anterior a la contenerización.
 
