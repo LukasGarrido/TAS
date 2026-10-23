@@ -4,11 +4,11 @@
 Documentar el uso de IA generativa en el proyecto, garantizando trazabilidad y validación de cada salida.
 
 ## Herramientas / Agentes de IA Utilizados
-| Agente / Modelo             | Uso previsto                                    |
-| --------------------------- | ----------------------------------------------- |
-| `Claude sonnet5`            | `Ayuda con scripts, errores y análisis de logs` |
-| `Gemini 36 flash - 3.1 pro` | `Redacción y corrección de faltas ortográficas` |
-| `Antigravity IDE`           | `Estrutura y orden de directorios y ficheros`   |
+| Agente / Modelo              | Uso previsto                                    |
+| ---------------------------- | ----------------------------------------------- |
+| `Claude`                     | `Ayuda con scripts, errores y análisis de logs` |
+| `Gemini 3.8 flash - 3.1 pro` | `Redacción y corrección de faltas ortográficas` |
+| `Antigravity IDE`            | `Estrutura y orden de directorios y ficheros`   |
 
 ## Registro de Uso
 - **Fecha:** `<YYYY-MM-DD>`

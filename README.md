@@ -13,7 +13,7 @@
 
 El proyecto tiene como propósito transformar un problema empresarial en una plataforma operable. El objetivo principal no es solamente instalar un CMS y mostrar su portada, sino construir una solución robusta que pueda ser publicada, administrada, diagnosticada, mantenida y recuperada ante posibles fallas. 
 
-Para lograr esto, el equipo (JoseCarlos, Octavio, Lukas), deberán actuar como un proveedor de infraestructura. En este rol es fundamental justificar cada decisión técnica y sobre la arquitectura, mediante el establecimiento de requerimientos, la ejecución de pruebas, la recolección de métricas, el análisis de logs y la creación de procedimientos que sean completamente reproducibles.  
+Para lograr esto, nuestro equipo, deberá actuar como un proveedor de infraestructura. En este rol es fundamental justificar cada decisión técnica y sobre la arquitectura, mediante el establecimiento de requerimientos, la ejecución de pruebas, la recolección de métricas, el análisis de logs y la creación de procedimientos que sean completamente reproducibles.  
 
 ---
 
@@ -52,14 +52,12 @@ nodo-sur/
 ├── infraestructura/
 │   └── Inventario preliminar de infraestructura.md
 └── scripts/
-    ├── 01_docker.md
-    ├── 02_monitor_vm.md
-    ├── 03_nfs.md
-    ├── 04_wordpress.md
-    ├── 05_monitoreo_nginx_bind.md
-    ├── 06_monitoreo_mariadb.md
-    ├── script_cms.md          (instalación tradicional, histórico)
-    ├── script_db.md           (instalación tradicional, histórico)
+    ├── scripts_docker.md
+    ├── scripts_VM-Monitoreo.md
+    ├── scripts_Servidor_NFS.md
+    ├── scripts_wordpress.md
+    ├── scripts_monitorización.md
+    ├── scripts_VM-Monitoreo.md
     └── script_dns.md
 ```
 
@@ -103,17 +101,17 @@ Este repositorio contiene la documentación, configuraciones, scripts, pruebas y
 
 Cada requerimiento incluye un umbral medible y una prueba. Instalar el servicio no demuestra por sí solo el cumplimiento.
 
-| ID | Requerimiento | Tipo (F/NF) | Criterio de aceptación (umbral) | Prueba de validación |
-|---|---|---|---|---|
-| RF-01 | Contar con un CMS funcional para catálogo, pedidos, reservas y administración de contenidos | Funcional | Un flujo completo (producto o reserva → pedido registrado) se ejecuta bajo el dominio único y el registro es localizable en la aplicación y en la BD | Ejecutar la compra o reserva desde un cliente y consultar la tabla correspondiente en MariaDB |
-| RNF-01 | Mantener la capa web operativa con al menos dos nodos web | No funcional | Con un backend detenido, ≥ 99 % de 100 solicitudes GET consecutivas responden 200 y la conmutación ocurre en ≤ 30 s | Detener el contenedor de WordPress de un backend y lanzar 100 solicitudes con `curl` en bucle; revisar los logs de acceso de Nginx |
-| RNF-02 | La base de datos opera de forma independiente y no expuesta | No funcional | El puerto 3306 solo responde a 10.33.199.50 y .51 (WordPress) y a 10.33.199.52 (monitorización); cualquier otro origen es rechazado | `nc -zv 10.33.199.53 3306` desde un origen autorizado y desde uno no autorizado; revisión de reglas del firewall |
-| RNF-03 | Persistencia y coherencia del estado compartido | No funcional | Un archivo subido por un backend se sirve con HTTP 200 y el mismo checksum desde el otro backend en ≤ 5 s | Subir una imagen y descargarla vía ambos backends; comparar `sha256sum` |
-| RNF-04 | Administración remota solo por canales seguros y nominativos | No funcional | Autenticación SSH por clave pública, un usuario por integrante, sin login por contraseña ni cuentas compartidas; una cuenta puede revocarse sin afectar a las demás | Revisar `sshd_config`; revocar una clave de prueba y verificar que el acceso falla |
-| RNF-05 | Detección de falla crítica en tiempo acotado | No funcional | Alerta de Alertmanager recibida en ≤ 5 min tras detener un backend, sin observar un panel | Detener un servicio y medir el tiempo entre el evento y la recepción de la alerta en el canal definido |
-| RNF-06 | Continuidad mediante respaldos verificados | No funcional | Retención ≥ 30 días; restauración completa en ≤ 60 min con pérdida de datos ≤ 24 h | Restaurar en una VM de prueba y medir tiempos y datos recuperados (Entrega 4) |
-| RNF-07 | Publicación bajo un dominio único con HTTPS válido | No funcional | `https://tas-06.arpa` responde sin error de certificado y HTTP en el 80 redirige a HTTPS | `curl -v` y `openssl s_client` desde un cliente |
-| RNF-08 | Trazabilidad y hora consistente en logs | No funcional | Desfase entre nodos ≤ 1 s y misma zona horaria en VM y contenedores; un evento puede reconstruirse correlacionando logs de proxy, web, BD y SSH | Comparar `chronyc tracking` y `date` en todos los nodos y seguir una solicitud entre logs (consulta en Loki) |
+| ID     | Requerimiento                                                                               | Tipo (F/NF)  | Criterio de aceptación (umbral)                                                                                                                                     | Prueba de validación                                                                                                               |
+| ------ | ------------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| RF-01  | Contar con un CMS funcional para catálogo, pedidos, reservas y administración de contenidos | Funcional    | Un flujo completo (producto o reserva → pedido registrado) se ejecuta bajo el dominio único y el registro es localizable en la aplicación y en la BD                | Ejecutar la compra o reserva desde un cliente y consultar la tabla correspondiente en MariaDB                                      |
+| RNF-01 | Mantener la capa web operativa con al menos dos nodos web                                   | No funcional | Con un backend detenido, ≥ 99 % de 100 solicitudes GET consecutivas responden 200 y la conmutación ocurre en ≤ 30 s                                                 | Detener el contenedor de WordPress de un backend y lanzar 100 solicitudes con `curl` en bucle; revisar los logs de acceso de Nginx |
+| RNF-02 | La base de datos opera de forma independiente y no expuesta                                 | No funcional | El puerto 3306 solo responde a 10.33.199.50 y .51 (WordPress) y a 10.33.199.52 (monitorización); cualquier otro origen es rechazado                                 | `nc -zv 10.33.199.53 3306` desde un origen autorizado y desde uno no autorizado; revisión de reglas del firewall                   |
+| RNF-03 | Persistencia y coherencia del estado compartido                                             | No funcional | Un archivo subido por un backend se sirve con HTTP 200 y el mismo checksum desde el otro backend en ≤ 5 s                                                           | Subir una imagen y descargarla vía ambos backends; comparar `sha256sum`                                                            |
+| RNF-04 | Administración remota solo por canales seguros y nominativos                                | No funcional | Autenticación SSH por clave pública, un usuario por integrante, sin login por contraseña ni cuentas compartidas; una cuenta puede revocarse sin afectar a las demás | Revisar `sshd_config`; revocar una clave de prueba y verificar que el acceso falla                                                 |
+| RNF-05 | Detección de falla crítica en tiempo acotado                                                | No funcional | Alerta de Alertmanager recibida en ≤ 5 min tras detener un backend, sin observar un panel                                                                           | Detener un servicio y medir el tiempo entre el evento y la recepción de la alerta en el canal definido                             |
+| RNF-06 | Continuidad mediante respaldos verificados                                                  | No funcional | Retención ≥ 30 días; restauración completa en ≤ 60 min con pérdida de datos ≤ 24 h                                                                                  | Restaurar en una VM de prueba y medir tiempos y datos recuperados (Entrega 4)                                                      |
+| RNF-07 | Publicación bajo un dominio único con HTTPS válido                                          | No funcional | `https://tas-06.arpa` responde sin error de certificado y HTTP en el 80 redirige a HTTPS                                                                            | `curl -v` y `openssl s_client` desde un cliente                                                                                    |
+| RNF-08 | Trazabilidad y hora consistente en logs                                                     | No funcional | Desfase entre nodos ≤ 1 s y misma zona horaria en VM y contenedores; un evento puede reconstruirse correlacionando logs de proxy, web, BD y SSH                     | Comparar `chronyc tracking` y `date` en todos los nodos y seguir una solicitud entre logs (consulta en Loki)                       |
 
 ### 5.3 Selección de CMS y suite
 
@@ -227,11 +225,11 @@ El NFS se aloja en la VM de la base de datos, y no en un nodo propio, por simpli
 
 **Alcance de los health checks.** La versión libre de Nginx solo ofrece detección pasiva (`max_fails`, `fail_timeout` y `proxy_next_upstream error timeout http_502 http_503 http_504`), según ADR-002.
 
-| Detecta | No detecta |
-|---|---|
-| Servicio caído o conexión rechazada | Contenido distinto entre nodos |
-| Timeouts del backend | Respuestas 200 lentas pero bajo el timeout |
-| Respuestas 502, 503 y 504 | Caída de la BD (afecta a ambos backends por igual) |
+| Detecta                             | No detecta                                         |
+| ----------------------------------- | -------------------------------------------------- |
+| Servicio caído o conexión rechazada | Contenido distinto entre nodos                     |
+| Timeouts del backend                | Respuestas 200 lentas pero bajo el timeout         |
+| Respuestas 502, 503 y 504           | Caída de la BD (afecta a ambos backends por igual) |
 
 Además, Nginx no reintenta por defecto solicitudes no idempotentes (POST). Un pedido que falla a mitad de camino no se reenvía al otro backend: se evita duplicarlo, pero ese cliente ve el error. Como complemento, Prometheus recolecta el estado de Nginx, Apache y MariaDB, y se incorporará un script con `curl` a un endpoint de salud de cada backend (verifica también la conexión a la BD), ejecutado por cron y con alerta.
 
@@ -321,13 +319,6 @@ Responsables propuestos según la distribución actual del trabajo; confirmar en
 | Entrega 4 | Alertas con destino, exporter de BIND9, agente de logs hacia Loki, backups automatizados y restauración | Equipo completo | Entrega 3 | Degradación controlada, alerta ≤ 5 min, restauración ≤ 60 min en VM de prueba | RNF-05, RNF-06 y RNF-08 verificados con marcas de tiempo | Restaurar la configuración anterior desde Git |
 | Entrega 5 | Auditoría final e incidente no anunciado | Equipo completo | Entrega 4 | Recuperación validada con el flujo de negocio, defensa individual | Matriz de pruebas completa | Etiqueta de versión estable del repositorio |
 
-### 5.8 Evidencias mínimas — checklist
-
-- [x] Matriz requisito → componente → prueba → evidencia (ver tabla siguiente)
-- [x] Diagrama legible y tabla de flujos/puertos
-- [x] Registro de decisiones de arquitectura (ADR-001 y ADR-002, ADR-003 por redactar)
-- [x] Inventario preliminar de VMs, CPU, RAM, disco, redes y dependencias (sección 6)
-- [x] Riesgos priorizados y tratamiento propuesto (sección 7)
 
 **Matriz de trazabilidad:**
 
@@ -357,7 +348,7 @@ Los recursos son estimaciones de diseño, salvo los de la VM de monitorización,
 | `tas-06-lukas` | MariaDB 11 (contenedor, 3306) + servidor NFS (2049) | 2 vCPU (estimado) | 4 GB (estimado) | 191,7 GB (real); uso actual 1,5 GB | 10.33.199.53 · IP pública 10.33.195.178 a retirar | — |
 | `tas-06-monitor` | Prometheus, Alertmanager, Loki y Grafana (contenedores) + mysqld-exporter | 2 vCPU (real) | 4 GB + 4 GB de swap (real) | 191,6 GB (real) | 10.33.199.52 · IP pública 10.33.195.245 a retirar | Exporters de los demás nodos |
 
-Versiones conocidas: la VM de monitorización usa Alpine Linux 3.24.2, Docker v29.8.1 y Docker Compose v5.1.4; las VM de CMS y de base de datos usan Alpine Linux. Completar el sistema operativo y las versiones del resto de los nodos. Las IP públicas pertenecen a la red `10.33.195.128/25` del laboratorio.
+Versiones conocidas: la VM de monitorización usa Alpine Linux 3.24.2, Docker v29.8.1 y Docker Compose v5.1.4, las VM de CMS y de base de datos usan Alpine Linux. Completar el sistema operativo y las versiones del resto de los nodos. Las IP públicas pertenecen a la red `10.33.195.128/25` del laboratorio.
 
 ---
 
@@ -395,37 +386,26 @@ Cada decisión relevante se documenta en `decisiones/ADR-XXX-titulo.md` con este
 ## Consecuencias
 ```
 
-| ADR | Decisión | Estado |
-|---|---|---|
-| ADR-001 | Selección de CMS: WordPress + WooCommerce frente a Joomla y Drupal | Aprobada |
-| ADR-002 | Nginx como balanceador en vez de HAProxy, con detección pasiva de fallas | Aprobada |
+| ADR     | Decisión                                                                                                              | Estado                 |
+| ------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| ADR-001 | Selección de CMS: WordPress + WooCommerce frente a Joomla y Drupal                                                    | Aprobada               |
+| ADR-002 | Nginx como balanceador en vez de HAProxy, con detección pasiva de fallas                                              | Aprobada               |
 | ADR-003 | Coherencia de archivos entre backends: NFS alojado en la VM de la BD frente a NFS en nodo propio y a `lsyncd`/`rsync` | Decidida, por redactar |
 
 ---
-
-## 9. Bitácora de contribuciones por integrante
-
-Cada integrante registra únicamente actividades respaldadas por evidencia en el repositorio. Detalle en `bitacora/bitacora-general.md`.
-
-| Fecha | Integrante | Actividad | Entrega asociada |
-|---|---|---|---|
-| | | | |
-
----
-
-## 10. Uso de inteligencia artificial
+## 9. Uso de inteligencia artificial
 
 > Registro obligatorio según normativa del proyecto. Detalle en `bitacora/uso-ia.md`.
 
-| Herramienta | Propósito | Fragmento relevante | Validación realizada | Cambios aplicados |
-|---|---|---|---|---|
-| Claude | Apoyo en redacción, estructura y corrección del informe, del README y de la documentación de scripts | Tablas de requerimientos con umbrales, política de datos, cálculo de capacidad N-1 y documentación de la configuración de Docker, NFS, monitorización y respaldo | A completar por el equipo: revisar cada cifra y comando y contrastarlo con pruebas y documentación oficial | A completar por el equipo |
+| Herramienta | Propósito                                                                                            | Fragmento relevante                                                                                                                                              | Validación realizada                                                                                       | Cambios aplicados         |
+| ----------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------- |
+| Claude      | Apoyo en redacción, estructura y corrección del informe, del README y de la documentación de scripts | Tablas de requerimientos con umbrales, política de datos, cálculo de capacidad N-1 y documentación de la configuración de Docker, NFS, monitorización y respaldo | A completar por el equipo: revisar cada cifra y comando y contrastarlo con pruebas y documentación oficial | A completar por el equipo |
 
 _Nota: la respuesta de una IA no constituye evidencia técnica. Todo código o comando debe poder ser explicado por cualquier integrante del equipo._
 
 ---
 
-## 11. Cómo reproducir / levantar el entorno
+## 10. Cómo reproducir / levantar el entorno
 
 Los secretos nunca se versionan: cada nodo usa su propio `.env` (con permisos `600`), creado a partir de los valores de referencia `.env.example`. Orden de ejecución:
 
