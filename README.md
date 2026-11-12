@@ -24,8 +24,8 @@ Para lograr esto, nuestro equipo, deberá actuar como un proveedor de infraestru
 | 1       | Informe de requerimientos y arquitectura | 05/09 |
 | 2       | Plataforma base y CMS funcional          | 05/09 |
 | 3       | Publicación resiliente y seguridad       | 23/09 |
-| 4       | Observabilidad y continuidad operacional |       |
-| 5       | Incidente, auditoría y defensa final     |       |
+| 4       | Observabilidad y continuidad operacional | 23/11 |
+| 5       | Incidente, auditoría y defensa final     | 30/11 |
 
 ---
 
