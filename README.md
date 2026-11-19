@@ -1,3 +1,5 @@
+<div align="center">
+
 # Nodo Sur — Plataforma digital resiliente
 
 **Asignatura:** EIN-090B · Taller de Administración de Sistemas
@@ -6,6 +8,9 @@
 - Josecarlos Vidal
 - Octavio Valencia
 - Lukas Garrido
+
+
+</div>
 
 ---
 

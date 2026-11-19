@@ -1,6 +1,11 @@
+<div align="center">
+
 # Configuración de la VM de monitoreo
 
 Stack de monitorización en `tas-06-monitor`: Prometheus (métricas), Alertmanager (alertas), Loki (logs) y Grafana (paneles), desplegado con Docker Compose. Es la base sobre la que se agregan los exporters de Nginx, BIND9, Apache y MariaDB (ver sus documentos).
+
+
+</div>
 
 ## Características de la VM
 

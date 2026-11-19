@@ -1,3 +1,5 @@
+<div align="center">
+
 # Servidor NFS para archivos compartidos de WordPress
 
 El servidor NFS corre en la VM de la base de datos (Alpine Linux, OpenRC) y comparte con los backends la configuración y los archivos subidos de WordPress, para que ambos nodos sirvan el mismo contenido.
@@ -9,6 +11,9 @@ El servidor NFS corre en la VM de la base de datos (Alpine Linux, OpenRC) y comp
 | Directorio exportado | `/srv/nfs/wordpress` |
 | Subdirectorios | `config/` y `uploads/` |
 | Puertos | 2049/TCP (NFS) y 111 (rpcbind) |
+
+
+</div>
 
 ## Servidor (VM de la base de datos)
 

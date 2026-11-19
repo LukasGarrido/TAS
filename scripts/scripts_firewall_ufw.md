@@ -1,4 +1,9 @@
+<div align="center">
+
 # Documentación: UFW en `tas-06-lukas` con acceso administrativo solo desde `tas-06-jose`
+
+
+</div>
 
 ## 1. Objetivo
 

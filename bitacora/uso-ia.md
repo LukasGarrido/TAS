@@ -1,4 +1,9 @@
+<div align="center">
+
 # ERMITIDO CON TRAZABILIDAD
+
+
+</div>
 
 ## Propósito
 Documentar el uso de IA generativa en el proyecto, garantizando trazabilidad y validación de cada salida.

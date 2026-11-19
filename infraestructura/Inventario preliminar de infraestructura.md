@@ -1,3 +1,11 @@
+<div align="center">
+
+# Inventario Preliminar de Infraestructura
+
+</div>
+
+---
+
 
 ## Nodos - máquinas virtuales
 

@@ -1,3 +1,5 @@
+<div align="center">
+
 # Monitorización del nodo perimetral: Nginx y BIND9
 
 Se habilita la exposición de métricas de los servicios del nodo perimetral (`tas-06-jose`, 10.33.199.49) para que Prometheus y Grafana, en `tas-06-monitor` (10.33.199.52), puedan monitorearlos.
@@ -6,6 +8,9 @@ Se habilita la exposición de métricas de los servicios del nodo perimetral (`t
 |---|---|---|---|---|
 | Nginx | `127.0.0.1:8081/nginx_status` | `nginx-prometheus-exporter` 1.3.0 | 9113 | `nginx-lb` |
 | BIND9 | `127.0.0.1:8053` (canal de estadísticas) | No configurado aún | — | — |
+
+
+</div>
 
 ## Nginx
 
@@ -168,4 +173,3 @@ curl -s http://127.0.0.1:8053/json/v1 | head -c 300
 ```
 
 Debe aparecer `127.0.0.1:8053` en escucha y una respuesta JSON. Si no responde, reiniciar el servicio `named`, porque algunos cambios de configuración no se aplican con `reconfig`.
-

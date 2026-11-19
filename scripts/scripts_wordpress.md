@@ -1,3 +1,5 @@
+<div align="center">
+
 # WordPress en contenedor (Docker) con exporter de Apache
 
 Despliegue de WordPress en cada backend (`tas-06-02` en 10.33.199.51 y `tas-06-cms-02` en 10.33.199.50). El procedimiento es idéntico en ambos nodos. Reemplaza la instalación tradicional descrita en `script_cms.md`.
@@ -14,6 +16,9 @@ Debe haber instalado antes docker, nfs y haber configurado un montaje para el ar
 | Configuración         | `wp-config.php` compartido por NFS, montado en `/mnt/wp-config`               |
 | Archivos subidos      | Volumen NFS `wp_uploads_shared` (10.33.199.53:`/srv/nfs/wordpress/uploads`)   |
 | Base de datos         | Definida en el `wp-config.php` compartido (no hay credenciales en el compose) |
+
+
+</div>
 
 ## Directorio de trabajo
 

@@ -1,6 +1,11 @@
+<div align="center">
+
 # Instalación de Docker y Docker Compose
 
 Docker se usa en los nodos del proyecto para ejecutar los servicios en contenedores: MariaDB en la VM de la base de datos y WordPress con su exporter en los backends.
+
+
+</div>
 
 ## Alpine Linux
 

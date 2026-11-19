@@ -1,6 +1,11 @@
+<div align="center">
+
 ## Contexto
 
 El enunciado propone como referencia una arquitectura con HAProxy como punto de entrada único, encargado de terminar TLS, distribuir tráfico entre backends y ejecutar health checks activos que retiren automáticamente un nodo defectuoso (RNF-01). Como equipo, definimos la arquitectura de despliegue usando **Nginx** en el mismo nodo perimetral que el servicio DNS, actuando como proxy inverso hacia los dos backends WordPress.
+
+
+</div>
 
 ## Opciones consideradas
 

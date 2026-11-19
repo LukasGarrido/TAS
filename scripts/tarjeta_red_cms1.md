@@ -1,8 +1,13 @@
+<div align="center">
+
 ### 23-10-2026 · CMS 1 (10.33.199.51) · Prueba de baja de la tarjeta pública
 
 **Objetivo:** dejar el CMS 1 con una sola tarjeta de red (privada) antes de quitar la pública en el hipervisor.
 
 # Configuración de IP privada en Alpine Linux (VM)
+
+
+</div>
 
 ## Diagnóstico y verificación
 ```bash

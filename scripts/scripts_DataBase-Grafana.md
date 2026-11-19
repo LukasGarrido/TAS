@@ -1,3 +1,5 @@
+<div align="center">
+
 # Monitorización de MariaDB con Prometheus y Grafana
 
 Se agrega un exporter de MariaDB al stack de monitorización de `tas-06-monitor` (10.33.199.52) para visualizar la base de datos (10.33.199.53) en Grafana.
@@ -10,6 +12,9 @@ Flujo de métricas: MariaDB (3306) → `mysqld-exporter` (en el monitor, 9104) �
 | Exporter | `prom/mysqld-exporter:v0.17.2`, puerto 9104 (solo red interna de Compose) |
 | Credenciales | `mysqld-exporter/.my.cnf`, permisos `600`, fuera del repositorio |
 | Job de Prometheus | `mariadb` |
+
+
+</div>
 
 ## Usuario de monitorización en MariaDB
 

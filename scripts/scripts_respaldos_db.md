@@ -1,4 +1,9 @@
+<div align="center">
+
 # Respaldo automático de MariaDB (VM `db`, 10.33.199.53)
+
+
+</div>
 
 ## Resumen
 

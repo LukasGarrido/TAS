@@ -1,6 +1,11 @@
+<div align="center">
+
 ## Contexto
 
 Nodo sur necesita de una plataforma que ayude a personal sin formación técnica publicar catálogo, gestionar pedidos, administrar reservas con cupos limitados y mantener contenidos, todo desde un único dominio
+
+</div>
+
 ## Opciones consideradas
 
 **WordPress + WooCommerce**
