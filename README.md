@@ -58,6 +58,7 @@ nodo-sur/
     ├── scripts_wordpress.md
     ├── scripts_monitorización.md
     ├── scripts_VM-Monitoreo.md
+    ├── scripts_firewall_ufw.md
     └── script_dns.md
 ```
 
@@ -414,7 +415,7 @@ Los secretos nunca se versionan: cada nodo usa su propio `.env` (con permisos `6
 3. **Backends (10.33.199.51 y .50):** montar el NFS y levantar WordPress con `scripts/04_wordpress.md`.
 4. **Nodo perimetral (10.33.199.49):** DNS y Nginx como balanceador hacia los backends.
 5. **Monitorización (10.33.199.52):** `scripts/02_monitor_vm.md`, y después los exporters con `scripts/05_monitoreo_nginx_bind.md` y `scripts/06_monitoreo_mariadb.md`.
-6. **Red:** dejar CMS 1, CMS 2, monitor y BD con una sola tarjeta (la privada), accediendo por salto desde el nodo perimetral.
+6. **Red y Firewall (UFW):** dejar CMS 1, CMS 2, monitor y BD con una sola tarjeta (la privada) y configurar UFW y reglas de `DOCKER-USER` según `scripts/scripts_firewall_ufw.md`.
 7. **Verificación:** ejecutar las pruebas de la matriz de trazabilidad (5.8) y guardar la evidencia en `evidencias/`.
 
 Los scripts `script_cms.md`, `script_db.md` y `script_dns.md` documentan la línea base de instalación tradicional, anterior a la contenerización.
