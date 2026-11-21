@@ -4,11 +4,6 @@
 
 **Asignatura:** EIN-090B · Taller de Administración de Sistemas
 
-**Colaboradores:**
-- Josecarlos Vidal
-- Octavio Valencia
-- Lukas Garrido
-
 
 </div>
 

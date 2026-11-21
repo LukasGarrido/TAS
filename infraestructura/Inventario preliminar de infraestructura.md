@@ -1,6 +1,10 @@
 <div align="center">
 
-# Inventario Preliminar de Infraestructura
+# Inventario de Infraestructura
+**Asignatura:** EIN-090B · Taller de Administración de Sistemas (TAS)  
+**Semestre:** 2026  
+**Repositorio:** [LukasGarrido/TAS](https://github.com/LukasGarrido/TAS)
+
 
 </div>
 
