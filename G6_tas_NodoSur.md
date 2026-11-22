@@ -408,7 +408,6 @@ El proyecto Nodo Sur demostró la viabilidad de construir una infraestructura re
 ## Anexo H — Uso de inteligencia artificial
 Registro conforme a `bitacora/uso-ia.md`:
 - **Claude:** Soporte en redacción de scripts de respaldo, comandos SQL, resolución de errores de red y diagnóstico de DNS para `tas-06.arpa`.
-- **Antigravity IDE / Gemini:** Asistencia en la estructuración de carpetas del repositorio, organización en Markdown y revisión ortográfica general.
 - *Validación:* Todo script o comando generado por IA fue probado empíricamente en el laboratorio antes de su integración.
 
 ## Anexo I — Correspondencia con las rúbricas
