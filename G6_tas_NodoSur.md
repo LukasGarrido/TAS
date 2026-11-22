@@ -44,16 +44,46 @@ A la fecha de la entrega final, la arquitectura, el modelo de seguridad, la pers
 
 ## Índice General
 
-1. Introducción
-2. Requerimientos y Arquitectura (Entrega 1)
-3. Plataforma Base y CMS Funcional (Entrega 2)
-4. Publicación Resiliente, Contenedores y Seguridad (Entrega 3)
-5. Observabilidad y Continuidad Operacional (Entrega 4)
-6. Incidente, Auditoría y Defensa Final (Entrega 5)
-7. Análisis Integrado de la Solución
-8. Conclusiones y Trabajo Futuro
-9. Referencias
-10. Anexos
+1. [Introducción](#1-introducción)
+   - [1.1 Contexto y motivación](#11-contexto-y-motivación)
+   - [1.2 Planteamiento del problema](#12-planteamiento-del-problema)
+   - [1.3 Objetivos](#13-objetivos)
+   - [1.4 Alcance y limitaciones](#14-alcance-y-limitaciones)
+   - [1.5 Metodología y organización del equipo](#15-metodología-y-organización-del-equipo)
+   - [1.6 Estructura del documento](#16-estructura-del-documento)
+2. [Requerimientos y Arquitectura (Entrega 1)](#2-requerimientos-y-arquitectura-entrega-1)
+   - [2.1 Problema, actores y activos críticos](#21-problema-actores-y-activos-críticos)
+   - [2.2 Requerimientos y criterios de aceptación](#22-requerimientos-y-criterios-de-aceptación)
+   - [2.3 Selección del CMS y la suite tecnológica](#23-selección-del-cms-y-la-suite-tecnológica)
+   - [2.4 Arquitectura, flujos y puertos](#24-arquitectura-flujos-y-puertos)
+   - [2.5 Seguridad y administración de datos](#25-seguridad-y-administración-de-datos)
+3. [Plataforma Base y CMS Funcional (Entrega 2)](#3-plataforma-base-y-cms-funcional-entrega-2)
+   - [3.1 Infraestructura, inventario y línea base](#31-infraestructura-inventario-y-línea-base)
+   - [3.2 Almacenamiento y permisos (NFS)](#32-almacenamiento-y-permisos-nfs)
+   - [3.3 DNS, servidor web y TLS](#33-dns-servidor-web-y-tls)
+4. [Publicación Resiliente, Contenedores y Seguridad (Entrega 3)](#4-publicación-resiliente-contenedores-y-seguridad-entrega-3)
+   - [4.1 Aplicación multicontenedor reproducible](#41-aplicación-multicontenedor-reproducible)
+   - [4.2 Balanceo pasivo y alta disponibilidad](#42-balanceo-pasivo-y-alta-disponibilidad)
+   - [4.3 Firewall y seguridad de red (DOCKER-USER)](#43-firewall-y-seguridad-de-red-docker-user)
+5. [Observabilidad y Continuidad Operacional (Entrega 4)](#5-observabilidad-y-continuidad-operacional-entrega-4)
+   - [5.1 Pila de monitorización y métricas](#51-pila-de-monitorización-y-métricas)
+   - [5.2 Alertas y trazabilidad de logs](#52-alertas-y-trazabilidad-de-logs)
+   - [5.3 Respaldo automático de MariaDB](#53-respaldo-automático-de-mariadb)
+6. [Incidente, Auditoría y Defensa Final (Entrega 5)](#6-incidente-auditoría-y-defensa-final-entrega-5)
+7. [Análisis Integrado de la Solución](#7-análisis-integrado-de-la-solución)
+   - [7.1 Cumplimiento de requerimientos](#71-cumplimiento-de-requerimientos)
+8. [Conclusiones y Trabajo Futuro](#8-conclusiones-y-trabajo-futuro)
+9. [Referencias](#9-referencias)
+10. [Anexos](#10-anexos)
+    - [Anexo A — Matriz de trazabilidad](#anexo-a--matriz-de-trazabilidad)
+    - [Anexo B — Inventario y versiones](#anexo-b--inventario-y-versiones)
+    - [Anexo C — Matriz de flujos, puertos y firewall](#anexo-c--matriz-de-flujos-puertos-y-firewall)
+    - [Anexo D — Runbook operativo](#anexo-d--runbook-operativo)
+    - [Anexo E — Bitácora de cambios](#anexo-e--bitácora-de-cambios)
+    - [Anexo F — Registro de Decisiones (ADR)](#anexo-f--registro-de-decisiones-adr)
+    - [Anexo G — Contribución individual](#anexo-g--contribución-individual)
+    - [Anexo H — Uso de inteligencia artificial](#anexo-h--uso-de-inteligencia-artificial)
+    - [Anexo I — Correspondencia con las rúbricas](#anexo-i--correspondencia-con-las-rúbricas)
 
 ## Glosario y siglas
 
