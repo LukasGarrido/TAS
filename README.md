@@ -149,26 +149,26 @@ Evaluación de alternativas para el proyecto, comparando WordPress frente a Joom
 flowchart LR
     cliente(["Cliente"])
 
-    subgraph PERIM["tas-06-jose · Nodo perimetral<br/>10.33.199.49 · ip pública 10.33.195.184"]
+    subgraph PERIM["dns · Nodo perimetral<br/>10.33.199.49 · ip pública 10.33.195.184"]
         direction LR
         dns(["DNS (BIND9)<br/>puerto 53"])
         nginx(["NGINX<br/>puertos 80 y 443<br/>exporter :9113"])
     end
 
-    subgraph CMS1["tas-06-02 · WordPress CMS 1<br/>10.33.199.51 · ip pública 10.33.195.212"]
+    subgraph CMS1["cms-1 · WordPress CMS 1<br/>10.33.199.51 · ip pública 10.33.195.212"]
         cms1(["WordPress (contenedor)<br/>puerto 8080<br/>exporter :9117"])
     end
 
-    subgraph CMS2["tas-06-cms-02 · WordPress CMS 2<br/>10.33.199.50 · ip pública 10.33.195.193"]
+    subgraph CMS2["cms-2 · WordPress CMS 2<br/>10.33.199.50 · ip pública 10.33.195.193"]
         cms2(["WordPress (contenedor)<br/>puerto 8080<br/>exporter :9117"])
     end
 
-    subgraph DBN["tas-06-lukas · Base de datos y archivos<br/>10.33.199.53 · ip pública 10.33.195.178"]
+    subgraph DBN["db · Base de datos y archivos<br/>10.33.199.53 · ip pública 10.33.195.178"]
         db(["MariaDB (contenedor)<br/>puerto 3306"])
         nfs(["Servidor NFS<br/>puerto 2049"])
     end
 
-    subgraph MON["tas-06-monitor · Monitorización<br/>10.33.199.52 · ip pública 10.33.195.245"]
+    subgraph MON["monitor · Monitorización<br/>10.33.199.52 · ip pública 10.33.195.245"]
         mon(["Prometheus · Alertmanager<br/>Loki · Grafana"])
     end
 
