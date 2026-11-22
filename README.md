@@ -34,6 +34,8 @@ Para lograr esto, nuestro equipo, deberá actuar como un proveedor de infraestru
 ```
 nodo-sur/
 ├── README.md
+├── assets/
+│   └── universidad-tecnica-federico-santa-maria-seeklogo.png
 ├── bitacora/
 │   ├── bitacora-general.md
 │   ├── entorno-de-trabajo.md

@@ -1,6 +1,6 @@
 <div align="center">
 
-# UNIVERSIDAD TÉCNICA FEDERICO SANTA MARÍA
+<img src="assets/universidad-tecnica-federico-santa-maria-seeklogo.png" alt="Universidad Técnica Federico Santa María" width="260" />
 
 **Departamento de electronica y informatica**
 **USM sede Concepción**
