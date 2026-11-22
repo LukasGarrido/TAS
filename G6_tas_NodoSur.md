@@ -402,8 +402,8 @@ El proyecto Nodo Sur demostró la viabilidad de construir una infraestructura re
 
 ## Anexo G — Contribución individual
 - **Josecarlos Vidal:** Configuración de DNS (BIND9), proxy inverso Nginx, certificado TLS y reglas de perimetral.
-- **Octavio Valencia:** Despliegue de contenedores WordPress, configuración de WooCommerce, plugins y exporters de Apache.
-- **Lukas Garrido:** Configuración de MariaDB 11, servidor NFS, scripts de respaldo automático con compresión y checksums, y cortafuegos UFW / `DOCKER-USER`.
+- **Octavio Valencia:** Despliegue de contenedores WordPress, configuración de WooCommerce, plugins y exporters de Apache, cortafuegos UFW.
+- **Lukas Garrido:** Configuración de MariaDB 11, servidor NFS, scripts de respaldo automático con compresión y checksums.
 
 ## Anexo H — Uso de inteligencia artificial
 Registro conforme a `bitacora/uso-ia.md`:
