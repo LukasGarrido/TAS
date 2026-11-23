@@ -49,8 +49,6 @@ nodo-sur/
 │       ├── Diagrama de despliegue.md
 │       ├── E1_grupo06_informe.docx
 │       └── diagrama-despliegue.png
-├── evidencias/
-│   └── evidencia1.md
 ├── infraestructura/
 │   └── Inventario preliminar de infraestructura.md
 └── scripts/

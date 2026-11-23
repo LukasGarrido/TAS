@@ -36,7 +36,7 @@ Nodo Sur es una red regional de pequeñas marcas, talleres creativos, productore
 
 La solución usa WordPress + WooCommerce en dos backends contenerizados (`wordpress:php8.3-apache`), un nodo perimetral con BIND9 y Nginx (proxy inverso, balanceador pasivo y bastión SSH), una VM de datos con MariaDB 11 y un servidor NFS compartido para archivos y configuración (`/srv/nfs/wordpress`), y una VM de monitorización con Prometheus (v3.5.0), Alertmanager (v0.28.1), Loki (v3.5.0) y Grafana (v11.6.0). Se definieron ocho requerimientos medibles (RF-01 y RNF-01 a RNF-08), objetivos de servicio (disponibilidad ≥ 99,5 %, detección ≤ 5 min, RTO ≤ 60 min, RPO ≤ 24 h) y un criterio de capacidad N-1.
 
-A la fecha de la entrega final, la arquitectura, el modelo de seguridad, la persistencia NFS y la observabilidad están desplegados y validados según los scripts y bitácoras del repositorio. El capítulo 7 compara el diseño de la Entrega 1 con la arquitectura final y concluye que la estructura se mantuvo, con brechas concentradas en controles operativos como el destino de las alertas, la frecuencia de respaldo y la restauración probada. Se documentan los respaldos automáticos de MariaDB con retención de 30 días, la segmentación mediante UFW y reglas de `DOCKER-USER`, y los puntos únicos de falla identificados (nodo perimetral y VM de datos).
+A la fecha de la entrega final, la arquitectura, el modelo de seguridad, la persistencia NFS y la observabilidad están desplegados y validados según los scripts y bitácoras del repositorio. El capítulo 7 compara el diseño de la Entrega 1 con la arquitectura final y concluye que la estructura se mantuvo, con brechas concentradas en controles operativos como el destino de las alertas, la frecuencia de respaldo y la restauración probada. Se documentan los respaldos automáticos de MariaDB, con copia externa diaria en el nodo perimetral y retención de 30 días en ambas ubicaciones, la segmentación mediante UFW y reglas de `DOCKER-USER`, y los puntos únicos de falla identificados (nodo perimetral y VM de datos).
 
 **Palabras clave:** WordPress, Nginx, balanceo, tolerancia a fallas, NFS, MariaDB, Prometheus, Loki, respaldo, RPO/RTO, runbook.
 
@@ -130,7 +130,7 @@ El equipo actúa como proveedor de infraestructura: cada decisión técnica debe
 
 ## 1.4 Alcance y limitaciones
 
-- **Incluye:** VM Alpine Linux con Docker, WordPress/WooCommerce, MariaDB 11, servidor NFS, BIND9, Nginx, pila completa de monitorización y respaldos automáticos.
+- **Incluye:** VM con Alpine Linux y Docker (el nodo perimetral usa Ubuntu 24.04), WordPress/WooCommerce, MariaDB 11, servidor NFS, BIND9, Nginx, pila completa de monitorización y respaldos automáticos.
 - **No incluye:** alta disponibilidad real del nodo perimetral ni de la base de datos, cifrado del tráfico interno entre proxy y backends, ni almacenamiento de objetos.
 - **Restricciones:** subred `10.33.199.48/29` (seis direcciones utilizables, cinco asignadas) y software libre, por ausencia de un equipo de desarrollo permanente en la organización.
 
@@ -283,6 +283,7 @@ flowchart LR
 | Monitor (.52) | CMS 1 y CMS 2 | 9117 | HTTP | `apache-exporter` |
 | Administrador | Nodo perimetral (IP pública .184) | 22 | SSH | Único punto de entrada administrativo (bastión) |
 | Nodo perimetral | Demás nodos (IP privadas) | 22 | SSH | Administración nominativa con salto (`ssh -J`) |
+| Nodo perimetral (.49) | VM `db` (.53) | 22 | SSH/SCP | Copia diaria de respaldos con el usuario `database` y una llave restringida (`from`, `restrict`) |
 | Todos los nodos | Fuente NTP | 123 | UDP | Sincronización horaria (RNF-08) |
 
 ## 2.5 Seguridad y administración de datos
@@ -301,7 +302,7 @@ flowchart LR
 
 | VM (Hostname) | Nodo | Rol y servicios | IP privada | IP pública / Red | SO y versión |
 |---|---|---|---|---|---|
-| `dns` | Perimetral | DNS (BIND9, puerto 53), Nginx (80/443), bastión SSH | `10.33.199.49` | `10.33.195.184` | Alpine Linux |
+| `dns` | Perimetral | DNS (BIND9, puerto 53), Nginx (80/443), bastión SSH, `nginx-exporter` (9113), copia externa de respaldos (`pull-db.sh`) | `10.33.199.49` | `10.33.195.184` | Ubuntu 24.04 LTS (88 GB libres) |
 | `cms-1` | CMS 1 | WordPress (`wordpress:php8.3-apache`, 8080), `apache-exporter` (9117) | `10.33.199.51` | Pública a retirar | Alpine Linux, Docker |
 | `cms-2` | CMS 2 | WordPress (`wordpress:php8.3-apache`, 8080), `apache-exporter` (9117) | `10.33.199.50` | Pública a retirar | Alpine Linux, Docker |
 | `db` | Datos | MariaDB 11 (3306), Servidor NFS (`/srv/nfs/wordpress`, 2049) | `10.33.199.53` | Pública a retirar | Alpine Linux, Docker (191,7 GB disco) |
@@ -309,7 +310,22 @@ flowchart LR
 
 ## 3.2 Almacenamiento y permisos (NFS)
 
-El servidor NFS en `db` exporta `/srv/nfs/wordpress` con los subdirectorios `config/` y `uploads/`. Los clientes (`cms-1` y `cms-2`) montan la configuración en `/mnt/wp-config` (con persistencia en `/etc/fstab` y `netmount`) y los archivos multimedia en el volumen Docker `wp_uploads_shared` mediante NFS v4 (`addr=10.33.199.53`).
+El servidor NFS corre en la VM `db` sobre Alpine Linux con OpenRC y comparte con los backends la configuración y los archivos subidos de WordPress, para que ambos nodos sirvan el mismo contenido. Se instala con `nfs-utils` y los servicios `rpcbind` y `nfs` se habilitan en el runlevel `default`.
+
+| Elemento | Valor |
+|---|---|
+| Servidor | `10.33.199.53` |
+| Clientes | `cms-1` (`10.33.199.51`) y `cms-2` (`10.33.199.50`) |
+| Directorio exportado | `/srv/nfs/wordpress`, con los subdirectorios `config/` y `uploads/` |
+| Puertos | 2049/TCP (NFS) y 111 (rpcbind) |
+| Propietario | `nobody:nobody` |
+| Opciones de exportación | `rw,sync,no_subtree_check,no_root_squash` sobre `10.33.199.48/29` |
+
+El `wp-config.php` se obtiene del backend con la configuración más completa, mediante `docker compose exec wordpress cat`, y se copia por `scp` a `/srv/nfs/wordpress/config/`. Los clientes montan esa carpeta en `/mnt/wp-config`, con persistencia en `/etc/fstab` y el servicio `netmount`, que monta los sistemas de archivos de red al iniciar una vez levantada la red. Los archivos multimedia se montan en el volumen Docker `wp_uploads_shared` mediante NFS v4 (`addr=10.33.199.53`).
+
+La verificación consiste en `rc-service nfs status` y `exportfs -v` en el servidor, y en `showmount -e`, `df -h /mnt/wp-config` y `sha256sum` del `wp-config.php` en cada cliente, cuyo resultado debe coincidir entre ambos backends.
+
+**Nota de seguridad.** La exportación cubre toda la subred `/29` y usa `no_root_squash`, mientras que el diseño de la Entrega 1 preveía exportar solo a `.50` y `.51`, sin `no_root_squash` y con propietario `www-data`. El acceso al puerto 2049 queda limitado a esos dos orígenes por UFW en la VM `db`, pero la desviación se registra en la sección 7.2.
 
 ## 3.3 DNS, servidor web y TLS
 
@@ -324,13 +340,26 @@ El servidor NFS en `db` exporta `/srv/nfs/wordpress` con los subdirectorios `con
 
 Todos los servicios corren bajo Docker y Docker Compose con imágenes de versión fija. Los backends ejecutan `wordpress:php8.3-apache` junto a `lusotycoon/apache-exporter` en el puerto 9117. Se habilitó el módulo `server-status` en Apache mediante `/opt/cms/status.conf` (`RewriteEngine Off`) para permitir el scraping de métricas.
 
+En los nodos Alpine la instalación usa los paquetes `docker` y `docker-cli-compose` del repositorio `community` de Alpine v3.24, y el servicio se habilita con `rc-update add docker default` para que arranque con el sistema. La verificación considera `rc-status`, `docker version`, `docker compose version` y `docker run --rm hello-world`. En el nodo perimetral, que usa Ubuntu 24.04, el exporter de Nginx también se ejecuta como contenedor con Docker Compose.
+
 ## 4.2 Balanceo pasivo y alta disponibilidad
 
 Mediante Nginx como proxy inverso y balanceador de carga, se distribuyen las peticiones hacia ambos backends WordPress. Ante la caída de un backend, la detección pasiva de Nginx (`max_fails`, `fail_timeout`) redirige el tráfico al nodo sano, garantizando tolerancia a fallas de nodo único.
 
 ## 4.3 Firewall y seguridad de red (`DOCKER-USER`)
 
-Dado que Docker manipula iptables directamente saltándose UFW, se configuraron reglas explícitas en la cadena `DOCKER-USER` en `db` y los demás nodos mediante scripts de inicio en `/etc/local.d/` para asegurar que el puerto 3306 de MariaDB y el 8080 de WordPress solo acepten tráfico desde los orígenes autorizados.
+La seguridad de red se organiza en dos capas independientes, porque Docker manipula iptables directamente y se salta UFW al publicar puertos.
+
+| Capa | Herramienta | Protege |
+|---|---|---|
+| Host | UFW | SSH y cualquier servicio del host, como el NFS |
+| Contenedor | `iptables`, cadena `DOCKER-USER` | Puertos publicados por Docker, como el 3306 de MariaDB |
+
+En la VM `db` el procedimiento documentado deja UFW con política `deny incoming` y con el SSH (22) permitido solo desde el nodo perimetral, que actúa como bastión. UFW se activa al arranque con `rc-update add ufw default`. Para MariaDB, la cadena `DOCKER-USER` acepta el puerto 3306 solo desde `10.33.199.50`, `.51` y `.52` y descarta el resto, usando `--ctorigdstport 3306` con `--ctdir ORIGINAL` para identificar el puerto original antes de la traducción de direcciones de Docker. Como esas reglas se pierden al reiniciar, se guardan en `/etc/local.d/firewall.start`, un script que espera a que Docker esté disponible, vacía la cadena y vuelve a cargar las reglas, y que se activa con `rc-update add local default`.
+
+El procedimiento incluye medidas de reversión. Antes de activar UFW se arma un temporizador de seguridad de 5 minutos que lo desactiva si algo sale mal, sin tocar `DOCKER-USER` para no abrir el 3306. Además se mantiene una secuencia de emergencia por la consola de la plataforma. Antes de dar por cerrado el cambio se prueba una segunda sesión SSH desde el bastión, un intento desde otra VM que debe fallar por tiempo de espera, la lista de reglas con `iptables -L DOCKER-USER -n -v --line-numbers` y la conectividad al 3306 con `nc` desde cada origen, además de una prueba de reinicio.
+
+Los puertos de los backends siguen el mismo patrón, con el 8080 permitido solo desde el nodo perimetral y el 9117 solo desde el monitor. La documentación del repositorio registra esa extensión como recomendación y no como cambio aplicado y verificado en `cms-1`, `cms-2` y `monitor`.
 
 ---
 
@@ -342,22 +371,90 @@ La VM `monitor` ejecuta el stack de observabilidad con puertos enlazados estrict
 
 | Componente | Exporter / Fuente | Puerto | Métrica clave / Job |
 |---|---|---|---|
-| Proxy Nginx | `nginx-prometheus-exporter` 1.3.0 | 9113 | `nginx_up`, conexiones activas (`job: nginx-lb`) |
+| Proxy Nginx | `nginx-prometheus-exporter` 1.3.0, alimentado por `stub_status` en `127.0.0.1:8081` | 9113 | `nginx_up`, conexiones activas (`job: nginx-lb`) |
 | Backends Apache | `apache-exporter` | 9117 | `apache_up`, workers ocupados |
 | Base de datos MariaDB | `prom/mysqld-exporter` v0.17.2 | 9104 | `mysql_up`, conexiones, consultas (`job: mariadb`) |
+| DNS BIND9 | Canal de estadísticas en `127.0.0.1:8053`, sin exporter | 8053 | Pendiente de conectar a Prometheus |
 | Monitorización central | Prometheus / Grafana / Loki | 9090 / 3000 / 3100 | Métricas de infraestructura, paneles y logs centralizados |
+
+**Nginx.** Se habilita un sitio exclusivo en `127.0.0.1:8081` con `stub_status` y acceso permitido solo desde el propio nodo. El exporter corre como contenedor con `network_mode: host` en el nodo perimetral para alcanzar esa dirección local y expone sus métricas en el puerto 9113. Prometheus lo consulta en `10.33.199.49:9113` con el job `nginx-lb`. La verificación consiste en consultar `nginx_status` y `/metrics` (donde `nginx_up` debe valer 1) y en comprobar el estado `UP` del objetivo en Prometheus.
+
+**MariaDB.** Se crea el usuario `prometheus`, restringido al origen `10.33.199.52`, con un máximo de tres conexiones y los privilegios mínimos `PROCESS`, `REPLICATION CLIENT` y `SELECT`. Las credenciales viven en `mysqld-exporter/.my.cnf` con permisos 600 y fuera del repositorio. El servicio se agrega al compose de `/opt/nodo-sur-monitoring` y el job `mariadb` apunta a `mysqld-exporter:9104` dentro de la red de Compose. La verificación comprueba que `mysql_up` valga 1, que el objetivo esté en `UP` y que ya no existan rechazos (`Access denied`) en los registros de MariaDB. En Grafana se crea una fuente de datos de tipo Prometheus y un panel con la consulta `mysql_up`.
+
+**BIND9.** Se habilita el canal de estadísticas en `127.0.0.1:8053`, sin autenticación y por eso limitado a la interfaz local, validado con `named-checkconf` y aplicado con `rndc reconfig`. Todavía no existe un exporter que lo conecte a Prometheus.
 
 ## 5.2 Alertas y trazabilidad de logs
 
 - **Alertas:** Alertmanager configurado en el puerto 9093 con reglas base en Prometheus (`alerts.yml`).
 - **Logs:** Recolectados y centralizados en Loki (retención de 7 días). Sincronización horaria por NTP en todos los nodos (RNF-08).
 
-## 5.3 Respaldo automático de MariaDB
+## 5.3 Respaldos automáticos de MariaDB y copia externa
 
-Se implementó un script automatizado en `/usr/local/bin/backup-db.sh` en la VM de base de datos, ejecutado mediante cron de root cada dos días a las 02:30 (días impares):
-- **Acción:** `mariadb-dump --all-databases --single-transaction --routines --triggers --events`.
-- **Verificación:** Validación con `tail` de la cadena `Dump completed`, compresión con `gzip`, comprobación de integridad (`gzip -t`) y generación de checksum SHA-256 (`.sha256`).
-- **Retención:** 30 días (`find ... -mtime +30 -delete`), con permisos restringidos (`640`, propietario `database`).
+El respaldo funciona en dos etapas que corren en máquinas distintas, lo que permite cumplir la retención de 30 días y la copia fuera del host de origen exigidas por RNF-06.
+
+| Etapa | Máquina | Qué hace | Cuándo |
+|---|---|---|---|
+| 1. Dump | `db` (`10.33.199.53`) | Genera el respaldo de todas las bases, lo comprime y crea su checksum | 02:30 hora de Chile, días pares del mes |
+| 2. Copia | Nodo perimetral (`10.33.199.49`) | Se conecta a la BD por SSH, trae los respaldos nuevos y verifica su checksum | 07:00 UTC (04:00 en Chile), todos los días |
+
+### Etapa 1: dump en la VM de datos
+
+El script `/usr/local/bin/backup-db.sh` se ejecuta desde el cron de root con `flock -n`, para evitar que dos ejecuciones se pisen entre sí. Corre como root porque necesita `docker exec`, y el propio script entrega los archivos al usuario `database`.
+
+- **Acción.** `mariadb-dump --all-databases --single-transaction --routines --triggers --events`, ejecutado dentro del contenedor. La opción `--single-transaction` produce un volcado consistente sin bloquear tablas InnoDB, de modo que no se frenan pedidos ni reservas. La contraseña de root se lee desde la variable de entorno del contenedor, por lo que no queda escrita en el script, en el historial ni en el crontab.
+- **Escritura segura.** El volcado se escribe primero en un archivo temporal `.part` y solo recibe su nombre final si pasó todas las validaciones. Nunca queda un respaldo a medias que parezca válido.
+- **Verificación.** Se comprueba la cadena `Dump completed` al final del volcado, se comprime con `gzip`, se valida con `gzip -t` y se genera un checksum SHA-256 (`.sha256`).
+- **Permisos.** Propietario `database` y modo 640. No se agregó ese usuario al grupo `docker`, porque equivale a otorgar privilegios de root.
+- **Retención.** Treinta días (`find ... -mtime +30 -delete`), aplicada al final, de modo que un fallo nunca deja la VM sin respaldos.
+- **Registro.** `/var/log/backup-db.log`, con hora de Chile porque el script fija `TZ=America/Santiago`.
+
+En la prueba manual, el volcado de 5,1 MB se comprimió a 1,0 MB y el checksum validó correctamente. Los respaldos generados por cron corresponden al 18, 20 y 22 de noviembre, con 776,1 KB, 776,1 KB y 809,0 KB respectivamente. El cron de Alpine (BusyBox) interpreta `*/2` en el día del mes como días pares, lo que se comprobó con los respaldos reales, y al cambiar de mes pueden pasar tres días entre respaldos, por ejemplo del 30 al 2.
+
+### Etapa 2: copia externa en el nodo perimetral
+
+El nodo perimetral trae los respaldos y la VM de datos no los envía. Esta decisión se tomó por tres razones. El firewall de la VM de datos solo acepta SSH entrante desde el nodo perimetral. Si la VM de datos se compromete, no tiene credenciales para entrar al nodo perimetral, de modo que la copia externa queda a salvo. Y no fue necesario abrir ninguna regla nueva de firewall.
+
+El script `~/pull-db.sh` se ejecuta con cron a las 07:00 UTC y con `flock -n`:
+
+- **Copia incremental.** Trae solo los respaldos que aún no tiene, por lo que puede ejecutarse las veces que se quiera sin duplicar ni gastar tráfico.
+- **Verificación.** Comprueba el SHA-256 de cada archivo copiado. Si no coincide, lo elimina y deja el error en el registro.
+- **Fecha original.** Usa `scp -p` para conservar la fecha del respaldo, de modo que la retención de 30 días cuente desde su creación y no desde su copia.
+- **Independencia.** No borra nada en la VM de datos ni replica borrados. Si un respaldo desaparece allí, la copia se conserva.
+- **Retención y registro.** Treinta días en `~/db`, con registro en `~/pull-db.log`.
+- **Horario.** El nodo perimetral usa UTC, por lo que el cron se escribió en esa zona. Las 07:00 UTC equivalen a las 04:00 en horario de verano y a las 03:00 en horario de invierno, siempre después del dump de las 02:30. Corre a diario aunque el dump sea cada dos días. Si no hay respaldo nuevo, el script termina con `0 nuevos`, de modo que no depende de la paridad de los días.
+
+La primera ejecución manual copió y verificó los tres respaldos existentes y la segunda no copió ninguno, lo que demuestra que es seguro repetirla. Una tarea temporal programada a tres minutos confirmó que cron la dispara sin intervención.
+
+### Acceso SSH de mínimo alcance
+
+Para esa copia se creó en el nodo perimetral una llave ed25519 dedicada (`id_pull`). Es una llave exclusiva para esta tarea, de modo que su revocación no afecta a otros accesos (RNF-04). No tiene contraseña porque cron no puede escribirla, y ese riesgo se compensa limitando su alcance en el destino:
+
+| Elemento | Efecto |
+|---|---|
+| `from="10.33.199.49"` | La llave solo sirve si la conexión proviene del nodo perimetral |
+| `restrict` | Desactiva terminal interactiva, reenvío de puertos, agente y X11, y deja disponibles solo comandos puntuales y `scp` |
+| Archivo en `/etc/ssh/authorized_keys.d/database` | Pertenece a root, de modo que el usuario no puede modificar sus propias llaves autorizadas |
+| Bloque `Match User database` al final de `sshd_config` | Afecta solo a ese usuario, y root y los demás siguen usando su `.ssh/authorized_keys` |
+
+El cambio se aplicó con una copia previa de la configuración (`sshd_config.bak`), validación con `sshd -t` y `reload`, que no corta las sesiones abiertas, con la consola de la plataforma disponible como vía de recuperación.
+
+**Hallazgo.** Al intentar instalar la llave con `ssh-copy-id` falló la escritura de `.ssh/authorized_keys`. La causa es que el `home` del usuario `database` es el mismo directorio que usa root, y su carpeta `.ssh` pertenece a root con permisos 700. Instalar la llave allí habría permitido entrar como root, lo que contradice `PermitRootLogin no` y el principio de accesos nominativos, por lo que se optó por el archivo de llaves aparte.
+
+### Estado y pendientes
+
+| Componente | Ubicación | Estado |
+|---|---|---|
+| Dump automático (02:30, días pares) | `db` | Funcionando, con respaldos del 18, 20 y 22 de noviembre |
+| Verificación de integridad (gzip y SHA-256) | `db` | Funcionando |
+| Retención de 30 días | `db` | Programada en el script |
+| Acceso SSH del nodo perimetral con llave restringida | `db` y nodo perimetral | Funcionando |
+| Copia automática (07:00 UTC, diaria) | Nodo perimetral | Programada y probada |
+| Verificación SHA-256 de cada copia | Nodo perimetral | Funcionando |
+| Retención de 30 días | Nodo perimetral | Programada en el script |
+
+Quedan pendientes tres elementos. El primero es la **prueba de restauración**, cuyo procedimiento está definido pero no ejecutado. Consiste en levantar un contenedor `mariadb:11` aparte, sin puertos publicados ni volúmenes compartidos, restaurar con `gunzip -c ... | docker exec -i`, comprobar que existan las bases `mydb` y `mysql` y que `mydb` tenga 52 tablas, medir el tiempo con `time` y eliminar el contenedor. Ese tiempo es el que se contrasta con el RTO de 60 minutos de RNF-06. El segundo es el **respaldo de los archivos del NFS y de las configuraciones**. El tercero es la **verificación del flujo completo sin intervención**, prevista para el siguiente dump, el 24 de noviembre a las 02:30, con la copia correspondiente después de las 04:00 hora de Chile.
+
+**Hallazgo de zona horaria.** En la prueba del 10/11 el volcado registró las 13:07, mientras el archivo en la VM marca las 10:07. El contenedor trabaja en UTC y la VM en hora de Chile (UTC-3), y el nodo perimetral también usa UTC. No afecta al respaldo, porque los scripts fijan `TZ`, pero confirma el riesgo de RNF-08 sobre zonas horarias distintas.
 
 ---
 
@@ -375,13 +472,13 @@ Las pruebas operativas y la simulación de incidentes se estructuran bajo el run
 |---|---|---|---|
 | RF-01 | CMS funcional (catálogo, pedidos, reservas) | [Implementado] | WordPress + WooCommerce operativo con BD centralizada |
 | RNF-01 | Capa web con al menos dos nodos | [Implementado] | Dos réplicas con balanceador Nginx |
-| RNF-02 | BD independiente y no expuesta | [Implementado] | MariaDB en VM dedicada, puerto 3306 restringido |
+| RNF-02 | BD independiente y no expuesta | [Implementado] | MariaDB en VM dedicada, puerto 3306 restringido en `DOCKER-USER` y persistente al reinicio |
 | RNF-03 | Persistencia y coherencia compartida | [Implementado] | Servidor NFS en `/srv/nfs/wordpress` |
-| RNF-04 | Administración SSH segura y nominativa | [Por evidenciar] | Claves públicas. Falta consolidar cuentas sin root |
+| RNF-04 | Administración SSH segura y nominativa | [Por evidenciar] | SSH en `db` solo desde el bastión y llave dedicada de alcance mínimo para los respaldos. Falta consolidar cuentas sin root en todos los nodos |
 | RNF-05 | Detección de falla crítica en tiempo acotado | [Parcial] | Pila Prometheus/Alertmanager lista. Falta definir destino |
-| RNF-06 | Continuidad y respaldos verificados | [Parcial] | Script automático cada dos días (02:30, días impares) con SHA-256. Falta prueba de restauración |
+| RNF-06 | Continuidad y respaldos verificados | [Parcial] | Dump automático cada dos días (02:30, días pares) con SHA-256 y copia externa diaria en el nodo perimetral, con retención de 30 días en ambos. Falta prueba de restauración y respaldo del NFS |
 | RNF-07 | Dominio único con HTTPS válido | [Implementado] | `https://tas-06.arpa` con Nginx TLS |
-| RNF-08 | Trazabilidad y hora consistente | [Implementado] | NTP configurado y Loki para logs |
+| RNF-08 | Trazabilidad y hora consistente | [Parcial] | NTP y Loki configurados. La zona horaria difiere entre nodos (VM `db` en hora de Chile, nodo perimetral y contenedores en UTC) |
 
 ## 7.2 Análisis comparativo: diseño de la Entrega 1 frente a la arquitectura final
 
@@ -389,13 +486,13 @@ Las pruebas operativas y la simulación de incidentes se estructuran bajo el run
 
 Este apartado contrasta lo que el equipo definió en el informe de la Entrega 1 con lo que quedó desplegado y documentado al cierre de la Entrega 4. Busca responder tres preguntas. La primera es si la arquitectura propuesta se mantuvo. La segunda es qué cambió y por qué. La tercera es qué elementos comprometidos en el diseño no aparecen cumplidos en la documentación final.
 
-Las fuentes utilizadas son el informe de la Entrega 1 ([E01_tas_06](https://github.com/LukasGarrido/TAS/blob/master/docs/entrega-1/E1_grupo06_informe.pdf) v.1), los registros de decisión ADR-001 y ADR-002, la bitácora general, el README del repositorio y los capítulos 2 a 5 de este informe.
+Las fuentes utilizadas son el informe de la Entrega 1 ([E01_tas_06](https://github.com/LukasGarrido/TAS/blob/master/docs/entrega-1/E1_grupo06_informe.pdf) v.1), los registros de decisión ADR-001 y ADR-002, la bitácora general, el README del repositorio, la documentación de scripts (`scripts_docker.md`, `scripts_Servidor_NFS.md`, `scripts_firewall_ufw.md`, `scripts_monitorización.md`, `scripts_DataBase-Grafana.md` y `respaldos-mariadb.md`) y los capítulos 2 a 5 de este informe.
 
 **Nota metodológica sobre el punto de partida.** El documento de la Entrega 1 que está en el repositorio no es el texto original sin modificar. Su propia introducción indica que la arquitectura evolucionó respecto de la propuesta inicial, que era una instalación tradicional con Nginx y PHP-FPM. Además describe la VM de monitorización con sus recursos reales, un elemento que la bitácora fecha el 15/11. Por esa razón la comparación usa tres puntos de referencia y no dos:
 
 1. **Propuesta inicial.** Se reconstruye a partir de la introducción de la Entrega 1, de los ADR y de los scripts de línea base tradicional (`script_cms.md`, `script_db.md` y `script_dns.md`).
 2. **Diseño de la Entrega 1.** Es la versión del informe disponible en el repositorio, que ya incorpora contenedores, NFS y monitorización.
-3. **Arquitectura final.** Es lo descrito en los capítulos 2 a 5 de este informe.
+3. **Arquitectura final.** Es lo descrito en los capítulos 2 a 5 de este informe, contrastado con la documentación de los scripts.
 
 Cada elemento comparado se clasifica con una de las siguientes categorías:
 
@@ -404,7 +501,7 @@ Cada elemento comparado se clasifica con una de las siguientes categorías:
 | **Se mantuvo** | El diseño de la Entrega 1 y el estado final coinciden |
 | **Se concretó** | El diseño ya existía y la implementación le agregó detalle verificable, como versiones, rutas o parámetros |
 | **Cambió** | El estado final difiere del diseño de la Entrega 1 |
-| **Brecha** | La Entrega 1 lo exigía y la documentación final no muestra que esté cumplido |
+| **Brecha** | La Entrega 1 lo exigía y la documentación final no muestra que esté cumplido, o muestra una configuración distinta |
 
 ### 7.2.2 Evolución de la arquitectura en tres estados
 
@@ -412,16 +509,16 @@ Cada elemento comparado se clasifica con una de las siguientes categorías:
 
 | Aspecto | Propuesta inicial | Diseño de la Entrega 1 | Arquitectura final | Clasificación |
 |---|---|---|---|---|
-| Modelo de despliegue | Instalación tradicional sobre las VM | Contenedores Docker en todos los servicios | Docker y Docker Compose con imágenes de versión fija | Cambió respecto de la propuesta inicial y se mantuvo desde la Entrega 1 |
+| Modelo de despliegue | Instalación tradicional sobre las VM | Contenedores Docker en todos los servicios | Docker y Docker Compose con imágenes de versión fija, instalados desde el repositorio `community` de Alpine v3.24 | Cambió respecto de la propuesta inicial y se mantuvo desde la Entrega 1 |
 | Servidor web de los backends | Nginx con PHP-FPM | Imagen `wordpress:php8.3-apache` | Misma imagen, con el módulo `server-status` habilitado mediante `/opt/cms/status.conf` | Cambió y luego se concretó |
 | Punto de entrada y balanceo | Nginx en el nodo perimetral junto con DNS, en lugar del HAProxy del enunciado (ADR-002) | Nginx como proxy inverso con detección pasiva (`max_fails`, `fail_timeout`) | Igual | Se mantuvo |
-| Archivos compartidos entre backends | Sin solución. Cada backend guardaba sus archivos de forma local | NFS alojado en la VM de base de datos (ADR-003) | NFS v4 con la configuración montada en `/mnt/wp-config` y las imágenes en el volumen Docker `wp_uploads_shared` | Cambió y luego se concretó |
-| Base de datos | MariaDB en VM separada | MariaDB 11 en contenedor, puerto 3306 restringido a .50, .51 y .52 | Igual, con reglas en `DOCKER-USER` | Se mantuvo y se concretó |
-| Monitorización | No contemplada | VM `monitor` con Prometheus, Alertmanager, Loki y Grafana, accesibles solo por túnel SSH | Igual, con versiones fijas y trabajos de recolección definidos (`nginx-lb`, `mariadb`) | Cambió y luego se concretó |
-| Respaldos | Un respaldo manual de la base anterior | Diseño automatizado con retención de 30 días y copia fuera del host | Script `backup-db.sh` con cron, verificación y retención de 30 días | Se concretó con desviaciones |
-| Seguridad de red | Sin controles específicos | UFW y reglas en `DOCKER-USER` | UFW y `DOCKER-USER` mediante scripts de inicio en `/etc/local.d/` | Se concretó |
+| Archivos compartidos entre backends | Sin solución. Cada backend guardaba sus archivos de forma local | NFS alojado en la VM de base de datos, exportado solo a `.50` y `.51` (ADR-003) | NFS v4 con exportación a toda la subred `/29`, configuración en `/mnt/wp-config` e imágenes en el volumen Docker `wp_uploads_shared` | Cambió, se concretó y presenta desviaciones |
+| Base de datos | MariaDB en VM separada | MariaDB 11 en contenedor, puerto 3306 restringido a `.50`, `.51` y `.52` | Igual, con reglas persistentes en `DOCKER-USER` y UFW en la VM | Se mantuvo y se concretó |
+| Monitorización | No contemplada | VM `monitor` con Prometheus, Alertmanager, Loki y Grafana, accesibles solo por túnel SSH | Igual, con versiones fijas, exporters de Nginx, Apache y MariaDB y trabajos definidos (`nginx-lb`, `mariadb`) | Cambió y luego se concretó |
+| Respaldos | Un respaldo manual de la base anterior | Diseño automatizado con retención de 30 días y copia fuera del host | Dump automático en la VM de datos y copia externa diaria en el nodo perimetral, con verificación SHA-256 y retención de 30 días en ambos | Se concretó con desviaciones |
+| Seguridad de red | Sin controles específicos | UFW y reglas en `DOCKER-USER` | UFW y `DOCKER-USER` documentados y verificados en la VM `db` mediante `/etc/local.d/firewall.start` | Se concretó en `db` |
 
-**Tabla 5.** Línea de tiempo según la bitácora general. Las fechas corresponden a la puesta en marcha de cada elemento y no necesariamente al orden en que se diseñó.
+**Tabla 5.** Línea de tiempo según la bitácora general y la documentación de scripts. Las fechas corresponden a la puesta en marcha de cada elemento y no necesariamente al orden en que se diseñó.
 
 | Fecha | Hito registrado | Elemento del diseño que materializa |
 |---|---|---|
@@ -434,8 +531,10 @@ Cada elemento comparado se clasifica con una de las siguientes categorías:
 | 18/09 | Corrección de las fotos que no aparecían en el segundo servidor | Coherencia de archivos entre nodos |
 | 20/09 | WordPress en contenedores con la base y la carpeta compartida | Dos backends contenerizados (RNF-01) |
 | 25/09 | Nginx como balanceador con HTTPS y pruebas de falla | RNF-01 y RNF-07 |
+| 10/11 | Prueba del volcado con las opciones definitivas y creación de `backup-db.sh` | Respaldos (RNF-06) |
 | 15/11 | VM de monitorización con tableros | Observabilidad (RNF-05 y RNF-08) |
-| 20/11 | Respaldos automáticos de la base de datos | Continuidad (RNF-06) |
+| 18/11 | Primer respaldo ejecutado por cron, seguido de los del 20 y el 22 | Respaldos automáticos (RNF-06) |
+| 22/11 | Llave SSH dedicada y copia externa diaria en el nodo perimetral | Copia fuera del host de origen (RNF-06) |
 | 23/11 | Cierre y entrega | Entrega 4 |
 
 ### 7.2.3 Elementos que se mantuvieron
@@ -454,7 +553,7 @@ La estructura general de la solución no cambió entre el diseño y la implement
 
 ### 7.2.4 Elementos que cambiaron o se concretaron
 
-**De instalación tradicional a contenedores.** El cambio más profundo respecto de la propuesta inicial fue abandonar la instalación directa sobre el sistema operativo y pasar a Docker y Docker Compose. Esto aportó reproducibilidad, ya que los servicios se levantan desde archivos versionados y con imágenes de versión fija. A cambio introdujo un efecto no trivial sobre la seguridad. Docker inserta sus propias reglas de iptables y por eso se salta el firewall del host. La bitácora del 12/09 documenta que la base de datos seguía aceptando conexiones desde cualquier origen pese a las reglas aplicadas. La solución fue agregar reglas explícitas en la cadena `DOCKER-USER`, que hoy se cargan al arranque mediante scripts en `/etc/local.d/`.
+**De instalación tradicional a contenedores.** El cambio más profundo respecto de la propuesta inicial fue abandonar la instalación directa sobre el sistema operativo y pasar a Docker y Docker Compose. Esto aportó reproducibilidad, ya que los servicios se levantan desde archivos versionados y con imágenes de versión fija. A cambio introdujo un efecto no trivial sobre la seguridad. Docker inserta sus propias reglas de iptables y por eso se salta el firewall del host. La bitácora del 12/09 documenta que la base de datos seguía aceptando conexiones desde cualquier origen pese a las reglas aplicadas. La solución fue agregar reglas explícitas en la cadena `DOCKER-USER`, que hoy se cargan al arranque mediante `/etc/local.d/firewall.start`, un script que espera a que Docker esté disponible antes de aplicarlas.
 
 **De Nginx con PHP-FPM a Apache con PHP 8.3 en los backends.** La propuesta inicial contemplaba Nginx también como servidor web de cada backend. La implementación final usa la imagen oficial `wordpress:php8.3-apache`, de modo que Nginx quedó reservado al nodo perimetral. Este cambio tuvo tres consecuencias:
 
@@ -462,39 +561,45 @@ La estructura general de la solución no cambió entre el diseño y la implement
 2. El cálculo de capacidad del diseño pasó a basarse en procesos de Apache (`MaxRequestWorkers`) y no en procesos de PHP-FPM.
 3. Parte de la justificación escrita en los ADR dejó de describir el estado real (ver 7.2.9).
 
-**De archivos locales a almacenamiento compartido.** En un primer momento cada backend guardaba por su cuenta las imágenes subidas, de modo que una foto cargada a través de un nodo no existía en el otro. El diseño resolvió esto con NFS y la implementación lo concretó con NFS v4, con la configuración compartida en `/mnt/wp-config` (persistente mediante `/etc/fstab` y el servicio `netmount`) y los archivos multimedia en el volumen Docker `wp_uploads_shared`. Con ello ambos backends comparten además `wp-config.php`, claves y salts, que es la condición para que una sesión iniciada en un nodo valga en el otro.
+**De archivos locales a almacenamiento compartido.** En un primer momento cada backend guardaba por su cuenta las imágenes subidas, de modo que una foto cargada a través de un nodo no existía en el otro. El diseño resolvió esto con NFS y la implementación lo concretó con NFS v4, con la configuración compartida en `/mnt/wp-config` (persistente mediante `/etc/fstab` y el servicio `netmount`) y los archivos multimedia en el volumen Docker `wp_uploads_shared`. Con ello ambos backends comparten además `wp-config.php`, claves y salts, que es la condición para que una sesión iniciada en un nodo valga en el otro. La implementación se apartó del diseño en la forma de exportar: el script exporta `/srv/nfs/wordpress` a toda la subred `10.33.199.48/29` con la opción `no_root_squash` y deja como propietario a `nobody:nobody`, mientras que la Entrega 1 preveía exportar solo a `.50` y `.51`, sin `no_root_squash` y con propietario `www-data` (uid 33). El acceso efectivo al puerto 2049 queda limitado a esos dos orígenes por UFW en la VM de datos, lo que atenúa la desviación sin eliminarla.
 
-**De una VM prevista a una pila de observabilidad con versiones y trabajos definidos.** La monitorización fue una incorporación posterior a la propuesta inicial. En la versión final quedó fijada con Prometheus v3.5.0, Alertmanager v0.28.1, Loki v3.5.0 y Grafana v11.6.0, con exporters para Nginx (1.3.0), Apache y MariaDB (v0.17.2). Cada uno aporta una métrica de vida (`nginx_up`, `apache_up` y `mysql_up`) sobre la que se pueden construir las reglas de alerta.
+**De una VM prevista a una pila de observabilidad con versiones y trabajos definidos.** La monitorización fue una incorporación posterior a la propuesta inicial. En la versión final quedó fijada con Prometheus v3.5.0, Alertmanager v0.28.1, Loki v3.5.0 y Grafana v11.6.0, con exporters para Nginx (1.3.0), Apache y MariaDB (v0.17.2). El exporter de Nginx se alimenta de un sitio `stub_status` accesible solo en `127.0.0.1:8081` y corre con `network_mode: host`. El de MariaDB usa un usuario `prometheus` limitado al origen `10.33.199.52`, con tres conexiones como máximo y privilegios mínimos de lectura de métricas. Cada exporter aporta una métrica de vida (`nginx_up`, `apache_up` y `mysql_up`) sobre la que se pueden construir las reglas de alerta.
 
-**De un respaldo manual a un respaldo automatizado.** La Entrega 1 reconocía que solo existía un respaldo manual de la base anterior. La implementación incorporó `backup-db.sh`, ejecutado por cron de root, que realiza el volcado con `mariadb-dump --all-databases --single-transaction --routines --triggers --events`, comprueba la cadena `Dump completed`, comprime con `gzip`, valida con `gzip -t`, genera un checksum SHA-256 y elimina lo anterior a 30 días. Este avance es real, pero se aparta del diseño en dos aspectos que se detallan en 7.2.5 y 7.2.7.
+**De un respaldo manual a un respaldo automatizado con copia externa.** La Entrega 1 reconocía que solo existía un respaldo manual de la base anterior. La implementación incorporó dos etapas en máquinas distintas. En la VM de datos, `backup-db.sh` realiza el volcado con `mariadb-dump --all-databases --single-transaction --routines --triggers --events`, comprueba la cadena `Dump completed`, comprime con `gzip`, valida con `gzip -t`, genera un checksum SHA-256 y elimina lo anterior a 30 días. En el nodo perimetral, `pull-db.sh` trae cada día los respaldos nuevos por SSH, verifica su checksum y aplica la misma retención. El diseño decidió que el nodo perimetral *jala* los respaldos en lugar de que la base de datos los *empuje*, porque el firewall de la VM de datos solo acepta SSH desde el nodo perimetral y porque una VM de datos comprometida no tendría credenciales para alcanzar la copia externa. Para ello se creó una llave dedicada, restringida con `from="10.33.199.49"` y `restrict` en un archivo de llaves bajo `/etc/ssh/authorized_keys.d/` y un bloque `Match User database` en `sshd_config`. Este avance cierra la exigencia de copia fuera del host de origen y se aparta del diseño en tres aspectos que se detallan en 7.2.5 y 7.2.7: la frecuencia, la falta de prueba de restauración y la ausencia del respaldo de los archivos del NFS.
 
 **Estado de los ADR.** El ADR-003 pasó de estar decidido y por redactar a figurar como aprobado en el Anexo F, justificado por las limitaciones de la subred `/29`.
 
-**Nomenclatura de los hosts.** La Entrega 1 y el README identifican las VM como `tas-06-jose`, `tas-06-02`, `tas-06-cms-02`, `tas-06-lukas` y `tas-06-monitor`. El inventario final las nombra `dns`, `cms-1`, `cms-2`, `db` y `monitor`. El cambio de nombres no altera la arquitectura, pero conviene confirmar que corresponde a un renombrado real de las máquinas y no solo a una simplificación del texto, para que el informe sea consistente con el repositorio.
+**Nomenclatura de los hosts.** La Entrega 1 y el README identifican las VM como `tas-06-jose`, `tas-06-02`, `tas-06-cms-02`, `tas-06-lukas` y `tas-06-monitor`. El inventario final las nombra `dns`, `cms-1`, `cms-2`, `db` y `monitor`, pero la documentación de scripts más reciente, incluida la de respaldos y la del firewall, sigue usando los nombres `tas-06-*`. El cambio de nombres no altera la arquitectura, pero conviene unificar el criterio para que el informe sea consistente con el repositorio.
+
+**Sistema operativo del nodo perimetral.** El inventario indica Alpine Linux para todas las VM, pero la documentación de respaldos y de monitorización muestra que el nodo perimetral usa Ubuntu 24.04, con `sites-available` de Nginx y `systemd`. La corrección se incorporó en la Tabla 2.
 
 ### 7.2.5 Brechas entre el diseño y la documentación final
 
-La Entrega 1 fijó varios controles y verificaciones que la documentación final no muestra como completados. Se listan como brechas y no como incumplimientos confirmados, ya que pueden estar implementados sin haberse documentado todavía.
+La Entrega 1 fijó varios controles y verificaciones que la documentación final no muestra como completados, y la documentación de scripts revela además algunas configuraciones que se apartan del diseño. Se listan como brechas y no como incumplimientos confirmados, ya que pueden estar resueltas sin haberse documentado todavía.
 
 **Tabla 6.** Brechas detectadas.
 
-| Elemento exigido en la Entrega 1 | Estado en la documentación final | Impacto | Acción propuesta |
+| Elemento | Estado en la documentación | Impacto | Acción propuesta |
 |---|---|---|---|
 | Retiro de las IP públicas de `cms-1`, `cms-2`, `db` y `monitor` | El inventario las mantiene como "Pública a retirar" | Si el puerto 8080 se publica en todas las interfaces, un cliente puede eludir Nginx | Retirar las segundas tarjetas o bloquear el acceso en `DOCKER-USER` y probar con `curl` desde fuera |
-| SSH nominativo, sin root y sin contraseña | RNF-04 figura como "Por evidenciar" | No se puede demostrar la revocación individual de accesos | Adjuntar `sshd_config` y la prueba de revocación de una clave |
+| SSH nominativo, sin root y sin contraseña | RNF-04 figura como "Por evidenciar". En `db` el SSH solo se acepta desde el nodo perimetral, pero el `home` del usuario `database` coincide con el de root | No se puede demostrar la revocación individual de accesos en todos los nodos | Adjuntar `sshd_config` y la prueba de revocación de una clave y separar los `home` |
 | Destino de las alertas | Alertmanager está activo, pero falta definir el receptor | RNF-05 no puede medirse, ya que ninguna alerta llega a una persona | Configurar correo o webhook y medir el tiempo hasta la alerta |
-| Respaldo diario para sostener un RPO de 24 h | El cron ejecuta el respaldo cada dos días | El RPO real puede llegar a unas 48 h y excede el objetivo | Pasar el respaldo a frecuencia diaria o justificar un RPO mayor |
-| Copia del respaldo fuera del host de origen | No se documenta | El respaldo se pierde junto con la VM de datos | Copiarlo al nodo perimetral u otro destino separado |
-| Respaldo de archivos del NFS y de configuraciones | No se documenta | Una falla del disco dejaría sin imágenes ni configuración | Agregar ambos al script de respaldo |
-| Restauración medida en un entorno de prueba | Falta | RTO y RPO continúan sin medirse | Restaurar en un contenedor aparte y registrar tiempos |
+| Frecuencia del respaldo frente al RPO de 24 h | El dump corre cada dos días (días pares) y al cambiar de mes pueden pasar tres días entre respaldos | El RPO real alcanza 2 días y, en el cambio de mes, 3, y excede el objetivo | Pasar el dump a frecuencia diaria o justificar un RPO mayor |
+| Respaldo de archivos del NFS y de configuraciones | La documentación lo declara pendiente | Una falla del disco dejaría sin imágenes ni configuración | Agregar ambos al flujo de respaldo y a la copia externa |
+| Restauración medida en un entorno de prueba | El procedimiento está definido en un contenedor aparte, pero no se ha ejecutado | RTO y RPO continúan sin medirse | Restaurar en el contenedor de prueba y registrar tiempos y conteo de tablas |
 | Script de salud activo con `curl` a cada backend | No se documenta | No hay compensación para la detección pasiva de Nginx | Implementarlo con cron y alerta |
-| Exporter para el canal de estadísticas de BIND9 | No figura en la pila | El DNS no tiene observabilidad | Incorporarlo o declarar el alcance excluido |
+| Exporter para el canal de estadísticas de BIND9 | La documentación indica que no está configurado | El DNS no tiene observabilidad | Incorporarlo o declarar el alcance excluido |
 | Prueba de capacidad N-1 y ajuste de `MaxRequestWorkers` | No se documentan resultados | El criterio de que un backend absorba el pico sigue sin validarse | Ejecutar `k6` o `ab` con un solo backend activo |
 | `DISALLOW_FILE_MODS` y `DISABLE_WP_CRON` | No se documentan | Riesgo de divergencia de plugins y de tareas programadas duplicadas | Aplicar y adjuntar la configuración |
 | Plugin de reservas con cupos | No se nombra | El flujo de talleres con cupos limitados queda sin su componente identificado | Documentar el plugin elegido, que la Entrega 1 dejó entre Amelia y Bookly |
 | Restricción de `/server-status` a la red interna | Se habilitó vía `status.conf` y no se documenta quién puede acceder | Posible exposición de métricas | Verificar que solo responda a la red interna y al monitor |
 | Agente de logs hacia Loki | Se afirma la centralización, pero no se nombra el agente | La trazabilidad de RNF-08 no es reproducible | Documentar el agente y su configuración |
-| Dimensionamiento medido de las VM | El inventario final no incluye CPU ni RAM de la mayoría de los nodos | Los valores de la Entrega 1 seguían siendo estimaciones | Completar con valores reales |
+| Dimensionamiento medido de las VM | El inventario no incluye CPU ni RAM de la mayoría de los nodos | Los valores de la Entrega 1 seguían siendo estimaciones | Completar con valores reales |
+| Exporter de MariaDB publicado en `0.0.0.0:9104` en la VM de datos | El listado de contenedores del 10/11 lo muestra abierto a todas las interfaces y UFW lo permite solo desde el monitor | UFW no protege puertos publicados por Docker, de modo que el puerto queda accesible desde cualquier origen que alcance la VM | Publicarlo en la IP privada o agregar una regla en `DOCKER-USER`, y aclarar si el exporter corre en `db`, en `monitor` o en ambas |
+| Recursión de BIND9 | El script de monitorización muestra `allow-recursion` y `allow-query-cache` en `any`, mientras la sección 3.3 declara la recursión restringida a la `/29` | Resolvedor abierto a cualquier origen, con riesgo de uso en ataques de amplificación | Confirmar la configuración vigente y limitarla a `10.33.199.48/29` y `localhost` |
+| Exportación NFS | Se exporta a toda la `/29` con `no_root_squash` y propietario `nobody:nobody` | Un cliente con privilegios de root en la subred podría actuar como root sobre los archivos compartidos | Exportar solo a `.50` y `.51` y evaluar `root_squash` con propietario `www-data` |
+| Firewall en `cms-1`, `cms-2`, `monitor` y nodo perimetral | La documentación registra la extensión del patrón como recomendación y no como cambio aplicado | Los puertos 8080 y 9117 podrían quedar sin restricción de origen | Aplicar y adjuntar las reglas por nodo, con prueba de reinicio |
+| Zona horaria homogénea | La VM `db` usa hora de Chile, mientras el nodo perimetral y los contenedores usan UTC | Dificulta la correlación de eventos entre logs (RNF-08) | Fijar `TZ` en contenedores y servidores o documentar la convención usada |
 
 ### 7.2.6 Comparación por requerimiento
 
@@ -504,15 +609,15 @@ La Entrega 1 fijó varios controles y verificaciones que la documentación final
 |---|---|---|---|
 | RF-01 | Flujo completo producto o reserva a pedido, localizable en la aplicación y en la BD | Implementado | WordPress con WooCommerce opera con base centralizada. Falta nombrar el plugin de reservas |
 | RNF-01 | Con un backend detenido, al menos 99 % de 100 solicitudes responden 200 y la conmutación ocurre en 30 s o menos | Implementado | Dos réplicas tras Nginx. Se recomienda adjuntar la salida de la prueba de 100 solicitudes |
-| RNF-02 | El 3306 solo responde a .50, .51 y .52 | Implementado | Cumplido mediante `DOCKER-USER` tras el hallazgo del 12/09 |
-| RNF-03 | Mismo archivo con el mismo checksum desde ambos backends en 5 s o menos | Implementado | Cumplido con NFS v4. Se recomienda adjuntar la comparación de `sha256sum` |
-| RNF-04 | SSH por clave, un usuario por integrante, sin root ni contraseña | Por evidenciar | Brecha en la demostración de la revocación individual |
+| RNF-02 | El 3306 solo responde a `.50`, `.51` y `.52` | Implementado | Cumplido con UFW y `DOCKER-USER` persistente, verificado con `nc` desde cada origen. Queda por cerrar el puerto 9104 |
+| RNF-03 | Mismo archivo con el mismo checksum desde ambos backends en 5 s o menos | Implementado | Cumplido con NFS v4, con verificación de `sha256sum` sobre `wp-config.php`. La exportación presenta desviaciones de seguridad |
+| RNF-04 | SSH por clave, un usuario por integrante, sin root ni contraseña | Por evidenciar | Hay SSH restringido al bastión y llave de alcance mínimo en `db`. Falta la demostración de revocación individual en todos los nodos |
 | RNF-05 | Alerta recibida en 5 min o menos tras detener un servicio | Parcial | La pila existe, pero sin destino de alertas no es medible |
-| RNF-06 | Retención de 30 días y restauración en 60 min o menos con pérdida de 24 h o menos | Parcial | Retención y verificación cumplidas. Frecuencia de cada dos días, sin copia separada y sin restauración probada |
+| RNF-06 | Retención de 30 días y restauración en 60 min o menos con pérdida de 24 h o menos | Parcial | Cumplidas la retención en dos ubicaciones, la verificación SHA-256 y la copia externa. Faltan la prueba de restauración, el respaldo del NFS y una frecuencia compatible con el RPO |
 | RNF-07 | HTTPS válido y redirección de HTTP a HTTPS | Implementado | Mismo diseño, con TLS terminado en Nginx |
-| RNF-08 | Desfase de 1 s o menos y reconstrucción de un evento entre logs | Implementado | NTP y Loki configurados. Conviene adjuntar la correlación de un evento |
+| RNF-08 | Desfase de 1 s o menos, misma zona horaria y reconstrucción de un evento entre logs | Parcial | NTP y Loki configurados, pero la zona horaria difiere entre nodos y contenedores |
 
-Del total de nueve requerimientos, seis figuran como implementados, uno por evidenciar y dos como parciales. Ninguno se descartó ni se modificó.
+Del total de nueve requerimientos, cinco figuran como implementados, uno por evidenciar y tres como parciales. Ninguno se descartó ni se modificó.
 
 ### 7.2.7 Comparación de los objetivos de servicio
 
@@ -522,9 +627,9 @@ Del total de nueve requerimientos, seis figuran como implementados, uno por evid
 |---|---|---|---|
 | Disponibilidad mensual | 99,5 % o más | Sin medición documentada | Prometheus permitiría calcularla a partir de `up`, pero el informe no presenta el resultado |
 | Detección de falla crítica | 5 min o menos | No verificable | Depende de definir el destino de las alertas |
-| RTO del servicio web | 60 min o menos | Sin medición | No se ha ejecutado una restauración medida |
-| RPO general | 24 h o menos | En riesgo | Con respaldos cada dos días el peor caso supera las 24 h |
-| Retención de respaldos | 30 días o más | Cumplido en local | Se aplica `find ... -mtime +30 -delete`. Falta la copia fuera del host |
+| RTO del servicio web | 60 min o menos | Sin medición | El procedimiento de restauración está definido, pero no se ha ejecutado |
+| RPO general | 24 h o menos | En riesgo | Con respaldos cada dos días, y tres en el cambio de mes, el peor caso supera las 24 h |
+| Retención de respaldos | 30 días o más | Cumplido | Se aplica `find ... -mtime +30 -delete` en la VM de datos y en el nodo perimetral, que es una ubicación distinta del host de origen |
 
 ### 7.2.8 Riesgos de la Entrega 1 y su estado final
 
@@ -532,19 +637,19 @@ Del total de nueve requerimientos, seis figuran como implementados, uno por evid
 
 | Riesgo de la Entrega 1 | Control previsto | Estado final | Fundamento |
 |---|---|---|---|
-| Credenciales compartidas o sin revocación | SSH nominativo, secretos en `.env` y `.my.cnf` con permisos 600 | Parcial | Los secretos están definidos, pero falta evidencia de las cuentas SSH |
-| Base de datos expuesta | Publicar en IP privada y restringir en `DOCKER-USER` | Mitigado | Incidente del 12/09 corregido con reglas explícitas |
-| Acceso directo a un backend | Publicar 8080 solo en la IP privada y retirar IP públicas | Parcial | `DOCKER-USER` restringe el 8080, pero las IP públicas siguen en el inventario |
+| Credenciales compartidas o sin revocación | SSH nominativo, secretos en `.env` y `.my.cnf` con permisos 600 | Parcial | Los secretos están definidos y la llave de respaldo es dedicada, pero falta evidencia de las cuentas SSH en todos los nodos |
+| Base de datos expuesta | Publicar en IP privada y restringir en `DOCKER-USER` | Mitigado | Reglas persistentes y verificadas en la VM de datos tras el incidente del 12/09 |
+| Acceso directo a un backend | Publicar 8080 solo en la IP privada y retirar IP públicas | Parcial | La restricción está verificada en `db` y recomendada para los backends. Las IP públicas siguen en el inventario |
 | Divergencia de archivos entre backends | NFS compartido y edición de archivos deshabilitada | Parcial | Uploads y configuración compartidos. Falta documentar `DISALLOW_FILE_MODS` |
 | Falla no detectada a tiempo | Alertas con destino y script de comprobación activa | Parcial | Reglas base presentes. Sin destino ni script de salud documentados |
-| Respaldo nunca probado | Respaldos automáticos, copia externa y restauración probada | Parcial | Respaldo automático con verificación. Falta copia externa y restauración |
+| Respaldo nunca probado | Respaldos automáticos, copia externa y restauración probada | Parcial | Respaldo automático con verificación y copia externa operativos. Falta restauración y respaldo del NFS |
 | Un backend no absorbe el pico | Prueba N-1 y ajuste de `MaxRequestWorkers` | Sin evidencia | No se presentan resultados de carga |
 | Certificado TLS mal configurado | Validación y renovación gestionada | Parcial | TLS operativo según RNF-07. La renovación no se documenta |
 | Plugins desactualizados o vulnerables | Actualización en pruebas y plugins mínimos | Sin evidencia | No se documenta el inventario de plugins |
-| Endpoints de estado y métricas expuestos | Restringir `/server-status` y exporters al monitor, BIND9 solo en localhost | Parcial | Servicios de observabilidad en `127.0.0.1` y BIND9 en `127.0.0.1:8053`. Falta verificar `/server-status` |
-| Resolvedor DNS abierto | Limitar la recursión a la subred `/29` | Mitigado | La sección 3.3 declara la recursión restringida. La prueba `REFUSED` desde fuera queda por adjuntar |
+| Endpoints de estado y métricas expuestos | Restringir `/server-status` y exporters al monitor, BIND9 solo en localhost | Parcial | `stub_status` en `127.0.0.1:8081` y BIND9 en `127.0.0.1:8053` cumplen. Falta verificar `/server-status` y el puerto 9104 |
+| Resolvedor DNS abierto | Limitar la recursión a la subred `/29` | Por confirmar | La sección 3.3 declara la recursión restringida, pero el script documentado muestra `any` |
 
-De los once riesgos, dos quedaron mitigados, siete parcialmente y dos sin evidencia.
+De los once riesgos, uno quedó mitigado, siete parcialmente, dos sin evidencia y uno por confirmar.
 
 ### 7.2.9 Vigencia de las decisiones de arquitectura
 
@@ -554,14 +659,16 @@ De los once riesgos, dos quedaron mitigados, siete parcialmente y dos sin eviden
 |---|---|---|---|
 | ADR-001 | WordPress con WooCommerce frente a Joomla y Drupal | Vigente | La decisión se sostiene. Su texto indica que WordPress es servido por Nginx y que Nginx maneja mejor la concurrencia que Apache, mientras que los backends finales ejecutan Apache. Conviene aclarar que la ventaja de Nginx aplica a la capa de proxy |
 | ADR-002 | Nginx como balanceador en vez de HAProxy | Vigente | Sus consecuencias se cumplieron, entre ellas la ausencia de health checks activos y de panel de estadísticas. La justificación que habla de Nginx con PHP-FPM como servidor web de cada backend ya no describe la implementación |
-| ADR-003 | NFS en la VM de base de datos | Vigente | Figura como aprobado en el Anexo F. Su archivo no se incluyó entre los documentos revisados para esta comparación |
+| ADR-003 | NFS en la VM de base de datos | Vigente | Figura como aprobado en el Anexo F. Su archivo no se incluyó entre los documentos revisados para esta comparación. El script de exportación se aparta de lo previsto en el diseño (ver 7.2.5) |
 
 ### 7.2.10 Hipótesis del diseño validadas por la operación
 
 La comparación permite observar qué anticipó correctamente la Entrega 1 y qué descubrió el equipo en la práctica.
 
-- **Docker y el firewall.** La Entrega 1 advertía que Docker se salta el firewall del host y que la restricción debía aplicarse en `DOCKER-USER`. La bitácora del 12/09 registra el hallazgo en la práctica, con la base de datos aceptando conexiones desde cualquier origen. El diseño fue correcto, pero el caso muestra que ese control debe aplicarse desde el primer despliegue y no después de detectar el problema.
+- **Docker y el firewall.** La Entrega 1 advertía que Docker se salta el firewall del host y que la restricción debía aplicarse en `DOCKER-USER`. La bitácora del 12/09 registra el hallazgo en la práctica, con la base de datos aceptando conexiones desde cualquier origen. El diseño fue correcto, pero el caso muestra que ese control debe aplicarse desde el primer despliegue y no después de detectar el problema. El mismo patrón reaparece con el puerto 9104 del exporter, que UFW permite solo desde el monitor pero que Docker publica en todas las interfaces.
 - **Estado compartido.** El diseño señalaba que WordPress es *stateful* y que con dos nodos había que resolver la coherencia de archivos. El síntoma apareció exactamente así el 18/09, con fotos visibles solo desde el servidor que las recibió. El NFS lo resolvió.
+- **Zonas horarias.** El README anticipaba el riesgo de zonas horarias distintas entre VM y contenedores, con un dump registrado a las 23:11 en una VM cuya hora local era las 20:11. La prueba del 10/11 lo repitió, con un volcado registrado a las 13:07 en un archivo que la VM marca a las 10:07. Se mitigó fijando `TZ` en los scripts de respaldo, pero el nodo perimetral sigue en UTC, de modo que la diferencia persiste a nivel de sistema.
+- **Diseño del respaldo externo.** No estaba previsto en la Entrega 1 el modelo en que el nodo perimetral trae los respaldos. Surgió de respetar el firewall existente, que solo permite SSH desde el bastión, y resultó más seguro que el modelo inverso. En el proceso apareció un hallazgo sobre cuentas, porque el `home` del usuario `database` coincide con el de root.
 - **Resolución de nombres desde la VPN.** Este punto no estaba previsto en la Entrega 1. Los clientes conectados por la red institucional no resolvían `tas-06.arpa` por un conflicto con el sufijo de búsqueda de la VPN, y fue necesario un ajuste manual en el archivo `hosts`. Es una limitación del entorno del laboratorio que conviene registrar como lección operativa.
 - **Capacidad.** El diseño condicionó la continuidad a que un backend pudiera absorber el 100 % del pico. Esa hipótesis sigue sin contrastarse con mediciones.
 
@@ -569,7 +676,9 @@ La comparación permite observar qué anticipó correctamente la Entrega 1 y qu�
 
 La arquitectura definida en la Entrega 1 se mantuvo en su estructura. Los cinco nodos, sus direcciones, los flujos entre ellos, las tecnologías principales y las decisiones de los ADR siguen siendo los mismos. Los cambios ocurridos fueron de implementación y de detalle, y se explican en su mayoría por dos motivos: la adopción de contenedores, que obligó a replantear el firewall y el servidor web de los backends, y la necesidad de resolver el estado compartido entre dos nodos.
 
-Las diferencias relevantes entre el diseño y el resultado no están en la arquitectura sino en los controles operativos que la hacen verificable. Las alertas sin destino, la frecuencia de respaldo, la falta de copia externa y de restauración probada, las cuentas SSH por consolidar y las IP públicas por retirar concentran las brechas de la Tabla 6. Ninguna de ellas exige rediseñar la solución. Todas se cierran con configuración y con evidencia.
+Respecto de la continuidad operacional, el avance sobre lo comprometido en el diseño es sustancial. Los respaldos pasaron de ser un archivo manual a un flujo automático de dos etapas, con verificación de integridad, retención de 30 días y copia fuera del host de origen, y la observabilidad cubre proxy, backends y base de datos con exporters de alcance mínimo.
+
+Las diferencias relevantes entre el diseño y el resultado no están en la arquitectura sino en los controles que la hacen verificable y en algunas configuraciones de acceso. Las alertas sin destino, la frecuencia de respaldo, la restauración sin probar, el respaldo pendiente del NFS, las cuentas SSH por consolidar y las IP públicas por retirar concentran las brechas operativas de la Tabla 6. A ellas se suman tres configuraciones que se apartan del diseño y que convendría corregir o justificar, que son la exportación del NFS, el puerto 9104 y la recursión de BIND9. Ninguna de ellas exige rediseñar la solución. Todas se cierran con configuración y con evidencia.
 
 Por último, los puntos únicos de falla identificados en la Entrega 1, el nodo perimetral y la VM de datos, permanecen sin cambios. Esto es coherente con el alcance declarado, pero implica que la solución entrega tolerancia a fallas en la capa web y no alta disponibilidad del servicio completo, tal como se anticipó desde el diseño.
 
@@ -577,9 +686,9 @@ Por último, los puntos únicos de falla identificados en la Entrega 1, el nodo 
 
 # 8. Conclusiones y Trabajo Futuro
 
-El proyecto Nodo Sur demostró la viabilidad de construir una infraestructura resiliente, contenerizada y observable con software libre sobre Alpine Linux. La separación de la base de datos, el uso de almacenamiento compartido NFS y la monitorización con Prometheus y Grafana otorgan una base sólida para la operación regional. La comparación con el diseño de la Entrega 1 muestra que la arquitectura se mantuvo: los cinco nodos, sus flujos y las decisiones de los ADR siguen vigentes, y los cambios fueron de implementación, principalmente la adopción de contenedores, el cambio del servidor web de los backends a Apache y la incorporación del NFS. Las diferencias relevantes están en los controles que hacen verificable la solución, como el destino de las alertas, la frecuencia de los respaldos, la copia externa, la restauración medida, las cuentas SSH nominativas y el retiro de las IP públicas.
+El proyecto Nodo Sur demostró la viabilidad de construir una infraestructura resiliente, contenerizada y observable con software libre sobre Alpine Linux. La separación de la base de datos, el uso de almacenamiento compartido NFS y la monitorización con Prometheus y Grafana otorgan una base sólida para la operación regional. La comparación con el diseño de la Entrega 1 muestra que la arquitectura se mantuvo: los cinco nodos, sus flujos y las decisiones de los ADR siguen vigentes, y los cambios fueron de implementación, principalmente la adopción de contenedores, el cambio del servidor web de los backends a Apache y la incorporación del NFS. Los respaldos avanzaron más allá de lo comprometido, con un flujo automático de dos etapas que incluye copia externa y verificación de integridad. Las diferencias relevantes están en los controles que hacen verificable la solución, como el destino de las alertas, la frecuencia de los respaldos, la restauración medida, el respaldo de los archivos del NFS, las cuentas SSH nominativas y el retiro de las IP públicas, y en tres configuraciones que conviene corregir o justificar, que son la exportación del NFS, el puerto 9104 del exporter y la recursión de BIND9.
 
-Como trabajo futuro se contempla la separación de DNS y Nginx, la replicación de MariaDB y la automatización completa de las pruebas de restauración.
+Como trabajo futuro se contempla la separación de DNS y Nginx, la replicación de MariaDB, la ejecución y medición de la prueba de restauración, el respaldo de los archivos del NFS y de las configuraciones, y el ajuste de la frecuencia de respaldo al RPO de 24 horas.
 
 ---
 
@@ -610,13 +719,18 @@ Como trabajo futuro se contempla la separación de DNS y Nginx, la replicación 
 1. **backend caído:** verificar `up` en Prometheus, reiniciar contenedor Docker o aislar temporalmente en `upstream` de Nginx.
 2. **BD caída:** revisar contenedor MariaDB, espacio en disco (`df -h`) y conexiones máximas (`max_connections`).
 3. **NFS no disponible:** verificar servicio `nfs` en `db` y punto de montaje en clientes con `df -h /mnt/wp-config`.
+4. **Respaldo no generado o inválido:** revisar `/var/log/backup-db.log` en `db` y `~/pull-db.log` en el nodo perimetral, comprobar el espacio con `df -h` y verificar los checksums con `sha256sum -c *.sha256` en ambas ubicaciones.
+5. **Restauración de la base de datos (procedimiento previsto, aún no probado):** levantar un contenedor `mariadb:11` aparte, sin puertos ni volúmenes compartidos, restaurar con `gunzip -c` hacia `docker exec -i`, verificar las bases `mydb` y `mysql`, medir con `time` y eliminar el contenedor.
+6. **Pérdida de acceso por firewall:** desde la consola de la plataforma ejecutar `ufw disable`, `iptables -F INPUT` y `iptables -P INPUT ACCEPT`.
 
 ## Anexo E — Bitácora de cambios
 - **2026-09-09:** Estructuración inicial del repositorio e inventario de infraestructura.
 - **2026-09-10:** Migración e importación de la base de datos desde la VM auxiliar hacia la VM `db`, con habilitación de acceso remoto al puerto 3306 y resolución DNS para `tas-06.arpa`.
 - **2026-09-20:** Despliegue de backends Docker con contenedores WordPress y montaje NFS compartido.
 - **2026-11-15:** Puesta en marcha de la VM de monitorización (`monitor`) con Prometheus, Alertmanager, Loki, Grafana y exporters.
-- **2026-11-20:** Implementación del script de respaldo automático de MariaDB con verificación SHA-256.
+- **2026-11-10:** Prueba del volcado con las opciones definitivas, hallazgo de la diferencia de zona horaria entre contenedor y VM, y creación de `backup-db.sh` en `db`.
+- **2026-11-18:** Primer respaldo ejecutado automáticamente por cron, seguido de los del 20 y el 22 de noviembre.
+- **2026-11-22:** Creación de la llave dedicada `id_pull`, del archivo de llaves `/etc/ssh/authorized_keys.d/database` y del bloque `Match User database` en `sshd_config`, y puesta en marcha de `pull-db.sh` en el nodo perimetral con cron a las 07:00 UTC.
 
 ## Anexo F — Registro de Decisiones (ADR)
 - **ADR-001:** Selección de WordPress + WooCommerce frente a Joomla y Drupal (Aprobada).
