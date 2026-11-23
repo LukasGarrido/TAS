@@ -28,7 +28,8 @@ Esta bitácora cuenta nuestra historia paso a paso en el desarrollo de **Nodo Su
 | **25/09/2026** | **Seguridad** | Configuramos el servidor que recibe a los clientes en la entrada, encargándose de repartir la visita entre los dos servidores web y de ponerle el candado de seguridad (HTTPS). Además, blindamos los accesos para que estuvieran seguros. | Hicimos pruebas simulando fallas para ver si el sitio seguía respondiendo. |
 | **15/11/2026** | **Monitorización** | Levantamos un servidor especial dedicado exclusivamente a vigilar la salud de toda la infraestructura. Armamos tableros visuales para ver si el procesador se ahoga, si la base de datos sufre o si los servidores web están felices. | Entramos a los tableros de control y revisamos que las alertas estuvieran activas. |
 | **20/11/2026** | **Respaldos automáticos** | Programamos un sistema automático para que, cada dos días a la madrugada, el servidor guarde una copia completa de la base de datos, la comprima y verifique que no esté corrupta. | Revisamos los reportes y logs generados tras las ejecuciones de prueba. |
-| **23/11/2026** | **Cierre y entrega final** | Juntamos todas las piezas, revisamos que los manuales de emergencia (runbooks) sirvieran por si alguien se equivoca, y dejamos la plataforma lista para la defensa. | Todo el sistema quedó operativo y documentado. |
+| **22/11/2026** | **Identidad visual y respaldos** | Incorporamos el logotipo oficial de la USM en la documentación e integramos los manuales detallados de respaldos automáticos en MariaDB y accesos seguros por SSH. | Verificación visual y pruebas de ejecución de respaldos. |
+| **23/11/2026** | **Cierre y entrega final** | Juntamos todas las piezas, realizamos mejoras estructurales profundas en el informe NODO SUR, limpiamos archivos obsoletos y dejamos la plataforma lista para la defensa. | Todo el sistema quedó operativo y documentado. |
 
 ---
 

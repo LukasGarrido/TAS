@@ -40,6 +40,7 @@ nodo-sur/
 │   ├── bitacora-general.md
 │   ├── entorno-de-trabajo.md
 │   └── uso-ia.md
+│   └── infraestructura.md
 ├── decisiones/
 │   ├── ADR-001 Selección de CMS.md
 │   └── ADR-002 Nginx como balanceador en vez de HAProxy.md
@@ -49,8 +50,6 @@ nodo-sur/
 │       ├── Diagrama de despliegue.md
 │       ├── E1_grupo06_informe.docx
 │       └── diagrama-despliegue.png
-├── infraestructura/
-│   └── Inventario preliminar de infraestructura.md
 └── scripts/
     ├── scripts_docker.md
     ├── scripts_VM-Monitoreo.md
