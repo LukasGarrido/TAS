@@ -1,39 +1,20 @@
-<div align="center">
+# Configurar VM de Monitoreo
 
-# Configuración de la VM de monitoreo
+## Características de la máquina virtual
 
-Stack de monitorización en `tas-06-monitor`: Prometheus (métricas), Alertmanager (alertas), Loki (logs) y Grafana (paneles), desplegado con Docker Compose. Es la base sobre la que se agregan los exporters de Nginx, BIND9, Apache y MariaDB (ver sus documentos).
-
-
-</div>
-
-## Características de la VM
-
-| Elemento | Valor |
+| Recurso | Valor |
 |---|---|
-| Sistema operativo | Alpine Linux 3.24.2 |
+| SO | Alpine 3.24.2 |
+| Disco | 191.6 GB |
+| RAM | 4 GB |
+| SWAP | 4 GB |
 | CPU | 2 núcleos |
-| RAM / Swap | 4 GB / 4 GB |
-| Disco | 191,6 GB |
+| IP pública | 10.33.195.245 (se quitará luego de la configuración) |
 | IP privada | 10.33.199.52 |
-| IP pública | 10.33.195.245 (se quitará al terminar la configuración) |
-| Docker / Compose | v29.8.1 / v5.1.4 |
-| Directorio de trabajo | `/opt/nodo-sur-monitoring` |
+| Docker | v29.8.1 |
+| Docker Compose | v5.1.4 |
 
-## Servicios
-
-| Servicio | Imagen | Puerto (solo `127.0.0.1`) | Función |
-|---|---|---|---|
-| Prometheus | `prom/prometheus:v3.5.0` | 9090 | Recolección de métricas y evaluación de reglas (retención 7 días) |
-| Alertmanager | `prom/alertmanager:v0.28.1` | 9093 | Agrupación y envío de alertas |
-| Loki | `grafana/loki:3.5.0` | 3100 | Almacenamiento de logs (retención 7 días) |
-| Grafana | `grafana/grafana:11.6.0` | 3000 | Paneles |
-
-Todos los puertos se publican solo en la interfaz local de la VM; el acceso desde fuera se hace por túnel SSH.
-
-## Estructura de directorios
-
-Ejecutar:
+## 1. Crear la estructura de directorios
 
 ```sh
 mkdir -p /opt/nodo-sur-monitoring/prometheus/rules
@@ -44,13 +25,12 @@ mkdir -p /opt/nodo-sur-monitoring/grafana/provisioning/datasources
 cd /opt/nodo-sur-monitoring
 ```
 
-Los archivos siguientes se crean con `cat > <archivo> <<'EOF'` desde ese directorio. Las comillas en `'EOF'` evitan que el shell interprete caracteres especiales.
-
-## Prometheus
+## 2. Configuración de Prometheus
 
 Archivo `prometheus/prometheus.yml`:
 
-```yaml
+```sh
+cat > prometheus/prometheus.yml <<'EOF'
 global:
   scrape_interval: 30s
   evaluation_interval: 30s
@@ -69,11 +49,15 @@ scrape_configs:
     static_configs:
       - targets:
           - prometheus:9090
+EOF
 ```
+
+## 3. Reglas de alertas
 
 Archivo `prometheus/rules/alerts.yml`:
 
-```yaml
+```sh
+cat > prometheus/rules/alerts.yml <<'EOF'
 groups:
   - name: nodo-sur
     rules:
@@ -85,13 +69,15 @@ groups:
         annotations:
           summary: "El endpoint de Prometheus no responde"
           description: "Prometheus no puede consultar sus propias métricas."
+EOF
 ```
 
-## Alertmanager
+## 4. Configuración de Alertmanager
 
 Archivo `alertmanager/alertmanager.yml`:
 
-```yaml
+```sh
+cat > alertmanager/alertmanager.yml <<'EOF'
 global:
   resolve_timeout: 5m
 
@@ -106,13 +92,15 @@ route:
 
 receivers:
   - name: laboratorio
+EOF
 ```
 
-## Loki
+## 5. Configuración de Loki
 
 Archivo `loki/loki.yml`:
 
-```yaml
+```sh
+cat > loki/loki.yml <<'EOF'
 auth_enabled: false
 
 server:
@@ -148,13 +136,15 @@ compactor:
   working_directory: /loki/retention
   retention_enabled: true
   delete_request_store: filesystem
+EOF
 ```
 
-## Compose
+## 6. Docker Compose
 
 Archivo `compose.yaml`:
 
-```yaml
+```sh
+cat > compose.yaml <<'EOF'
 services:
   prometheus:
     image: prom/prometheus:v3.5.0
@@ -217,13 +207,12 @@ volumes:
   alertmanager_data:
   loki_data:
   grafana_data:
+EOF
 ```
 
-## Credencial de Grafana
+## 7. Generar la contraseña de Grafana
 
-La contraseña del administrador se genera en el momento y se guarda en `.env`, fuera del repositorio. `umask 077` hace que el archivo quede con permisos `600`.
-
-Ejecutar:
+Se genera una contraseña aleatoria y se guarda en `.env` con permisos restringidos:
 
 ```sh
 umask 077
@@ -231,28 +220,24 @@ printf 'GRAFANA_ADMIN_PASSWORD=%s\n' \
   "$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')" > .env
 ```
 
-Compose lee el `.env` de esa carpeta automáticamente. Si la variable faltara, `:?` hace fallar el arranque en vez de usar una contraseña vacía.
+## 8. Validar y levantar los servicios
 
-## Validar y levantar
-
-Ejecutar:
+Validar la sintaxis del compose:
 
 ```sh
 docker compose config -q
 ```
 
-No debe imprimir nada si la sintaxis es correcta. Después:
+Descargar las imágenes e iniciar los contenedores:
 
 ```sh
 docker compose pull
 docker compose up -d
 ```
 
-## Acceso mediante túnel SSH
+## 9. Habilitar reenvío de puertos local en SSH
 
-Como los puertos solo escuchan en `127.0.0.1`, se habilita el reenvío local de puertos en SSH. El comando respalda la configuración, ajusta o agrega la directiva, valida la sintaxis y recién entonces reinicia el servicio.
-
-Ejecutar:
+Como los servicios solo escuchan en `127.0.0.1`, se habilita `AllowTcpForwarding local` en SSH para poder acceder mediante túnel. Se respalda el archivo, se aplica el cambio, se valida la configuración y se reinicia el servicio:
 
 ```sh
 cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak &&
@@ -262,31 +247,4 @@ else
   echo 'AllowTcpForwarding local' >> /etc/ssh/sshd_config
 fi &&
 sshd -t && rc-service sshd restart
-```
-
-Con `local` solo se permiten túneles iniciados por el cliente. Desde el equipo del administrador:
-
-```sh
-ssh -L 3000:127.0.0.1:3000 <usuario>@10.33.199.52
-```
-
-Luego se abre `http://localhost:3000` en el navegador. Para revertir: `cp /etc/ssh/sshd_config.bak /etc/ssh/sshd_config` y reiniciar `sshd`.
-
-## Verificación
-
-Ejecutar:
-
-```sh
-docker compose ps
-curl -s http://127.0.0.1:9090/-/ready
-curl -s http://127.0.0.1:9093/-/healthy
-curl -s http://127.0.0.1:3100/ready
-curl -s http://127.0.0.1:3000/api/health
-sshd -T | grep -i allowtcpforwarding
-```
-
-Los cuatro servicios deben figurar como `running`, cada comprobación debe responder sin error y `sshd -T` debe mostrar `allowtcpforwarding local`. En Prometheus, el job `prometheus` debe aparecer en `UP`:
-
-```sh
-curl -s http://127.0.0.1:9090/api/v1/targets | head -c 300
 ```
