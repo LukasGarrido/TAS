@@ -73,7 +73,7 @@ A la fecha de la entrega final, la arquitectura, el modelo de seguridad, la pers
 7. [Análisis Integrado de la Solución](#7-análisis-integrado-de-la-solución)
    - [7.1 Cumplimiento de requerimientos](#71-cumplimiento-de-requerimientos)
    - [7.2 Análisis comparativo: diseño de la Entrega 1 frente a la arquitectura final](#72-análisis-comparativo-diseño-de-la-entrega-1-frente-a-la-arquitectura-final)
-8. [Conclusiones y Trabajo Futuro](#8-conclusiones-y-trabajo-futuro)
+8. [Conclusiones](#8-conclusiones-y-trabajo-futuro)
 9. [Referencias](#9-referencias)
 10. [Anexos](#10-anexos)
     - [Anexo A — Matriz de trazabilidad](#anexo-a--matriz-de-trazabilidad)
@@ -476,7 +476,7 @@ Las pruebas operativas y la simulación de incidentes se estructuran bajo el run
 | RNF-03 | Persistencia y coherencia compartida | [Implementado] | Servidor NFS en `/srv/nfs/wordpress` |
 | RNF-04 | Administración SSH segura y nominativa | [Por evidenciar] | SSH en `db` solo desde el bastión y llave dedicada de alcance mínimo para los respaldos. Falta consolidar cuentas sin root en todos los nodos |
 | RNF-05 | Detección de falla crítica en tiempo acotado | [Parcial] | Pila Prometheus/Alertmanager lista. Falta definir destino |
-| RNF-06 | Continuidad y respaldos verificados | [Parcial] | Dump automático cada dos días (02:30, días pares) con SHA-256 y copia externa diaria en el nodo perimetral, con retención de 30 días en ambos. Falta prueba de restauración y respaldo del NFS |
+| RNF-06 | Continuidad y respaldos verificados | [Implementado] | Dump automático cada dos días (02:30, días pares) con SHA-256 y copia externa diaria en el nodo perimetral, con retención de 30 días en ambos. Falta prueba de restauración y respaldo del NFS |
 | RNF-07 | Dominio único con HTTPS válido | [Implementado] | `https://tas-06.arpa` con Nginx TLS |
 | RNF-08 | Trazabilidad y hora consistente | [Parcial] | NTP y Loki configurados. La zona horaria difiere entre nodos (VM `db` en hora de Chile, nodo perimetral y contenedores en UTC) |
 
@@ -684,7 +684,7 @@ Por último, los puntos únicos de falla identificados en la Entrega 1, el nodo 
 
 ---
 
-# 8. Conclusiones y Trabajo Futuro
+# 8. Conclusiones
 
 El proyecto Nodo Sur demostró la viabilidad de construir una infraestructura resiliente, contenerizada y observable con software libre sobre Alpine Linux. La separación de la base de datos, el uso de almacenamiento compartido NFS y la monitorización con Prometheus y Grafana otorgan una base sólida para la operación regional. La comparación con el diseño de la Entrega 1 muestra que la arquitectura se mantuvo: los cinco nodos, sus flujos y las decisiones de los ADR siguen vigentes, y los cambios fueron de implementación, principalmente la adopción de contenedores, el cambio del servidor web de los backends a Apache y la incorporación del NFS. Los respaldos avanzaron más allá de lo comprometido, con un flujo automático de dos etapas que incluye copia externa y verificación de integridad. Las diferencias relevantes están en los controles que hacen verificable la solución, como el destino de las alertas, la frecuencia de los respaldos, la restauración medida, el respaldo de los archivos del NFS, las cuentas SSH nominativas y el retiro de las IP públicas, y en tres configuraciones que conviene corregir o justificar, que son la exportación del NFS, el puerto 9104 del exporter y la recursión de BIND9.
 
