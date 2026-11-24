@@ -147,3 +147,48 @@ Para desplegar, administrar o auditar la plataforma, consulte los manuales espec
 ## 9. Licencia / Uso Académico
 
 Proyecto desarrollado con fines académicos para la asignatura **EIN-090B · Taller de Administración de Sistemas**, Universidad Técnica Federico Santa María (Sede Concepción).
+
+---
+
+## Índice de Navegación por Directorios
+
+Documentación, bitácoras, configuraciones y registros de arquitectura del repositorio.
+
+- **[binnacle/](binnacle/)** — Bitácora e infraestructura del proyecto:
+  - [`Infraestructura.md`](binnacle/Infraestructura.md)
+  - [`bitacora-general.md`](binnacle/bitacora-general.md)
+  - [`entorno-de-trabajo.md`](binnacle/entorno-de-trabajo.md)
+  - [`uso-ia.md`](binnacle/uso-ia.md)
+
+- **[configurations/](configurations/)** — Scripts y manuales de configuración de servicios:
+  - [`configurar-grafana-mariadb.md`](configurations/configurar-grafana-mariadb.md)
+  - [`configurar-grafana-nginx.md`](configurations/configurar-grafana-nginx.md)
+  - [`configurar-grafana-wordpress.md`](configurations/configurar-grafana-wordpress.md)
+  - [`configurar-vm-monitoreo.md`](configurations/configurar-vm-monitoreo.md)
+  - [`grafana.json`](configurations/grafana.json)
+  - [`respaldos-mariadb.md`](configurations/respaldos-mariadb.md)
+  - [`scripts_DataBase-Grafana.md`](configurations/scripts_DataBase-Grafana.md)
+  - [`scripts_docker.md`](configurations/scripts_docker.md)
+  - [`scripts_firewall_ufw.md`](configurations/scripts_firewall_ufw.md)
+  - [`scripts_Servidor_NFS.md`](configurations/scripts_Servidor_NFS.md)
+  - [`scripts_wordpress.md`](configurations/scripts_wordpress.md)
+  - [`tarjeta_red_cms1.md`](configurations/tarjeta_red_cms1.md)
+
+- **[decisions/](decisions/)** — Registros de Decisiones de Arquitectura (ADR):
+  - [`ADR-001 Selección de CMS.md`](decisions/ADR-001%20Selección%20de%20CMS.md)
+  - [`ADR-002 Nginx como balanceador en vez de HAProxy.md`](decisions/ADR-002%20Nginx%20como%20balanceador%20en%20vez%20de%20HAProxy.md)
+
+- **[docs/](docs/)** — Documentación general e informes:
+  - [`caso-de-negocio.md`](docs/caso-de-negocio.md)
+  - [`plan-implementacion.md`](docs/plan-implementacion.md)
+  - [`reproduccion-entorno.md`](docs/reproduccion-entorno.md)
+  - [`riesgos.md`](docs/riesgos.md)
+  - **[docs/E01/](docs/E01/)** — Entrega 1:
+    - [`Diagrama de despliegue.md`](docs/E01/Diagrama%20de%20despliegue.md)
+  - **[docs/pdf/](docs/pdf/)** — Informes oficiales en PDF:
+    - [`E1_grupo06_informe.pdf`](docs/pdf/E1_grupo06_informe.pdf)
+    - [`G6_tas_NodoSur.pdf`](docs/pdf/G6_tas_NodoSur.pdf)
+    - [`Proyecto_Integrador_TAS_2026_Nodo_Sur.pdf`](docs/pdf/Proyecto_Integrador_TAS_2026_Nodo_Sur.pdf)
+
+- **[assets/](assets/)** — Recursos gráficos:
+  - [`universidad-tecnica-federico-santa-maria-seeklogo.png`](assets/universidad-tecnica-federico-santa-maria-seeklogo.png)
