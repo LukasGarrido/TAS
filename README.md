@@ -44,7 +44,6 @@ Como proveedores de infraestructura, el equipo ha justificado cada decisión té
 ```
 nodo-sur/
 ├── .gitignore
-├── G6_tas_NodoSur.md
 ├── index.md
 ├── README.md
 ├── assets/
@@ -77,6 +76,8 @@ nodo-sur/
     ├── riesgos.md
     ├── E01/
     │   └── Diagrama de despliegue.md
+    ├── E05/
+    │   └── G6_tas_NodoSur.md
     └── pdf/
         ├── E1_grupo06_informe.pdf
         ├── G6_tas_NodoSur.pdf
@@ -185,6 +186,8 @@ Documentación, bitácoras, configuraciones y registros de arquitectura del repo
   - [`riesgos.md`](docs/riesgos.md)
   - **[docs/E01/](docs/E01/)** — Entrega 1:
     - [`Diagrama de despliegue.md`](docs/E01/Diagrama%20de%20despliegue.md)
+  - **[docs/E05/](docs/E05/)** — Entrega 5:
+    - [`G6_tas_NodoSur.md`](docs/E05/G6_tas_NodoSur.md)
   - **[docs/pdf/](docs/pdf/)** — Informes oficiales en PDF:
     - [`E1_grupo06_informe.pdf`](docs/pdf/E1_grupo06_informe.pdf)
     - [`G6_tas_NodoSur.pdf`](docs/pdf/G6_tas_NodoSur.pdf)
