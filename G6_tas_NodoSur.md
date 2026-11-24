@@ -277,7 +277,7 @@ flowchart LR
 | Cliente | Nginx (.49) | 80 | HTTP | Solo redirección a HTTPS |
 | Nginx (.49) | CMS 1 (.51) y CMS 2 (.50) | 8080 | HTTP | Reenvío a los backends, único origen permitido |
 | CMS 1 / CMS 2 | MariaDB (.53) | 3306 | TCP | Consultas a la BD, solo por red privada |
-| CMS 1 / CMS 2 | NFS (.53) | 2049 | NFS/TCP | Montaje de `wp-config.php` y `wp-content/uploads` |
+| CMS 1 / CMS 2 | NFS (.53) | 2049 | NFS/TCP | Volúmenes Docker NFS con `wp-config.php` y `wp-content/uploads` |
 | Monitor (.52) | MariaDB (.53) | 3306 | TCP | `mysqld-exporter` (puerto 9104) con usuario de solo métricas |
 | Monitor (.52) | Nginx (.49) | 9113 | HTTP | `nginx-prometheus-exporter` |
 | Monitor (.52) | CMS 1 y CMS 2 | 9117 | HTTP | `apache-exporter` |
@@ -310,7 +310,7 @@ flowchart LR
 
 ## 3.2 Almacenamiento y permisos (NFS)
 
-El servidor NFS corre en la VM `db` sobre Alpine Linux con OpenRC y comparte con los backends la configuración y los archivos subidos de WordPress, para que ambos nodos sirvan el mismo contenido. Se instala con `nfs-utils` y los servicios `rpcbind` y `nfs` se habilitan en el runlevel `default`.
+El servidor NFS corre en la VM `db` sobre Alpine Linux con OpenRC y comparte con los backends la configuración y los archivos subidos de WordPress, para que ambos nodos sirvan el mismo contenido. Las VM de WordPress no montan el recurso en su sistema de archivos: lo consumen directamente como volúmenes Docker de tipo NFS. Se instala con `nfs-utils` y los servicios `rpcbind` y `nfs` se habilitan en el runlevel `default`.
 
 | Elemento | Valor |
 |---|---|
@@ -321,16 +321,16 @@ El servidor NFS corre en la VM `db` sobre Alpine Linux con OpenRC y comparte con
 | Propietario | `nobody:nobody` |
 | Opciones de exportación | `rw,sync,no_subtree_check,no_root_squash` sobre `10.33.199.48/29` |
 
-El `wp-config.php` se obtiene del backend con la configuración más completa, mediante `docker compose exec wordpress cat`, y se copia por `scp` a `/srv/nfs/wordpress/config/`. Los clientes montan esa carpeta en `/mnt/wp-config`, con persistencia en `/etc/fstab` y el servicio `netmount`, que monta los sistemas de archivos de red al iniciar una vez levantada la red. Los archivos multimedia se montan en el volumen Docker `wp_uploads_shared` mediante NFS v4 (`addr=10.33.199.53`).
+El `wp-config.php` se obtiene del backend con la configuración más completa, mediante `docker compose exec wordpress cat`, y se copia por `scp` a `/srv/nfs/wordpress/config/`. En los backends **no existe un montaje NFS a nivel de sistema operativo** (no se usan `/etc/fstab` ni el servicio `netmount`): la configuración y los archivos multimedia se exponen a los contenedores mediante volúmenes Docker con el controlador `local` y opciones NFS v4 (`type=nfs`, `o=addr=10.33.199.53,rw`), por ejemplo `wp_uploads_shared` para `wp-content/uploads`. Docker monta el volumen al iniciar el contenedor, por lo que la disponibilidad del NFS en `db` condiciona el arranque de los backends.
 
-La verificación consiste en `rc-service nfs status` y `exportfs -v` en el servidor, y en `showmount -e`, `df -h /mnt/wp-config` y `sha256sum` del `wp-config.php` en cada cliente, cuyo resultado debe coincidir entre ambos backends.
+La verificación consiste en `rc-service nfs status` y `exportfs -v` en el servidor, y en `docker volume inspect wp_uploads_shared` y `docker compose exec wordpress sha256sum` sobre `wp-config.php` en cada backend, cuyo resultado debe coincidir entre ambos.
 
 **Nota de seguridad.** La exportación cubre toda la subred `/29` y usa `no_root_squash`, mientras que el diseño de la Entrega 1 preveía exportar solo a `.50` y `.51`, sin `no_root_squash` y con propietario `www-data`. El acceso al puerto 2049 queda limitado a esos dos orígenes por UFW en la VM `db`, pero la desviación se registra en la sección 7.2.
 
 ## 3.3 DNS, servidor web y TLS
 
 - BIND9 en `dns` resuelve el dominio interno `tas-06.arpa`, con recursión restringida a la subred `10.33.199.48/29` y canal de estadísticas en `127.0.0.1:8053`.
-- Nginx termina TLS y redirige HTTP (80) a HTTPS (443).
+- Nginx termina TLS en el nodo perimetral y redirige HTTP (80) a HTTPS (443). El certificado del dominio `tas-06.arpa` fue generado y firmado con **OpenSSL**, dado que un dominio `.arpa` no puede validarse con una CA pública. Se valida con `curl -v` y `openssl s_client -connect tas-06.arpa:443`. El cifrado llega hasta Nginx, el tráfico entre el proxy y los backends viaja sin cifrar por la red privada (ver 1.4). [CONFIRMAR: ruta de certificado y llave, vigencia y procedimiento de renovación.]
 
 ---
 
@@ -344,7 +344,7 @@ En los nodos Alpine la instalación usa los paquetes `docker` y `docker-cli-comp
 
 ## 4.2 Balanceo pasivo y alta disponibilidad
 
-Mediante Nginx como proxy inverso y balanceador de carga, se distribuyen las peticiones hacia ambos backends WordPress. Ante la caída de un backend, la detección pasiva de Nginx (`max_fails`, `fail_timeout`) redirige el tráfico al nodo sano, garantizando tolerancia a fallas de nodo único.
+Mediante Nginx como proxy inverso y balanceador de carga, se distribuyen las peticiones hacia ambos backends WordPress con el algoritmo **round robin**, que es el predeterminado de Nginx (sin `ip_hash` ni `least_conn`), de modo que las peticiones se alternan entre `cms-1` y `cms-2`. Ante la caída de un backend, la detección pasiva de Nginx (`max_fails`, `fail_timeout`) redirige el tráfico al nodo sano, garantizando tolerancia a fallas de nodo único.
 
 ## 4.3 Firewall y seguridad de red (`DOCKER-USER`)
 
@@ -509,10 +509,10 @@ Cada elemento comparado se clasifica con una de las siguientes categorías:
 
 | Aspecto | Propuesta inicial | Diseño de la Entrega 1 | Arquitectura final | Clasificación |
 |---|---|---|---|---|
-| Modelo de despliegue | Instalación tradicional sobre las VM | Contenedores Docker en todos los servicios | Docker y Docker Compose con imágenes de versión fija, instalados desde el repositorio `community` de Alpine v3.24 | Cambió respecto de la propuesta inicial y se mantuvo desde la Entrega 1 |
+| Modelo de despliegue | Instalación tradicional sobre las VM | Contenedores Docker en todos los servicios | Docker y Docker Compose con imágenes de versión fija, instalados desde el repositorio `community` de Alpine v3.24 en los nodos Alpine, y con Docker Compose en el nodo perimetral (Ubuntu 24.04) | Cambió respecto de la propuesta inicial y se mantuvo desde la Entrega 1 |
 | Servidor web de los backends | Nginx con PHP-FPM | Imagen `wordpress:php8.3-apache` | Misma imagen, con el módulo `server-status` habilitado mediante `/opt/cms/status.conf` | Cambió y luego se concretó |
-| Punto de entrada y balanceo | Nginx en el nodo perimetral junto con DNS, en lugar del HAProxy del enunciado (ADR-002) | Nginx como proxy inverso con detección pasiva (`max_fails`, `fail_timeout`) | Igual | Se mantuvo |
-| Archivos compartidos entre backends | Sin solución. Cada backend guardaba sus archivos de forma local | NFS alojado en la VM de base de datos, exportado solo a `.50` y `.51` (ADR-003) | NFS v4 con exportación a toda la subred `/29`, configuración en `/mnt/wp-config` e imágenes en el volumen Docker `wp_uploads_shared` | Cambió, se concretó y presenta desviaciones |
+| Punto de entrada y balanceo | Nginx en el nodo perimetral junto con DNS, en lugar del HAProxy del enunciado (ADR-002) | Nginx como proxy inverso con balanceo round robin y detección pasiva (`max_fails`, `fail_timeout`) | Igual | Se mantuvo |
+| Archivos compartidos entre backends | Sin solución. Cada backend guardaba sus archivos de forma local | NFS alojado en la VM de base de datos, exportado solo a `.50` y `.51` (ADR-003) | NFS v4 con exportación a toda la subred `/29`, configuración e imágenes como volúmenes Docker NFS (p. ej. `wp_uploads_shared`), sin montaje NFS en el sistema operativo de los backends | Cambió, se concretó y presenta desviaciones |
 | Base de datos | MariaDB en VM separada | MariaDB 11 en contenedor, puerto 3306 restringido a `.50`, `.51` y `.52` | Igual, con reglas persistentes en `DOCKER-USER` y UFW en la VM | Se mantuvo y se concretó |
 | Monitorización | No contemplada | VM `monitor` con Prometheus, Alertmanager, Loki y Grafana, accesibles solo por túnel SSH | Igual, con versiones fijas, exporters de Nginx, Apache y MariaDB y trabajos definidos (`nginx-lb`, `mariadb`) | Cambió y luego se concretó |
 | Respaldos | Un respaldo manual de la base anterior | Diseño automatizado con retención de 30 días y copia fuera del host | Dump automático en la VM de datos y copia externa diaria en el nodo perimetral, con verificación SHA-256 y retención de 30 días en ambos | Se concretó con desviaciones |
@@ -561,7 +561,7 @@ La estructura general de la solución no cambió entre el diseño y la implement
 2. El cálculo de capacidad del diseño pasó a basarse en procesos de Apache (`MaxRequestWorkers`) y no en procesos de PHP-FPM.
 3. Parte de la justificación escrita en los ADR dejó de describir el estado real (ver 7.2.9).
 
-**De archivos locales a almacenamiento compartido.** En un primer momento cada backend guardaba por su cuenta las imágenes subidas, de modo que una foto cargada a través de un nodo no existía en el otro. El diseño resolvió esto con NFS y la implementación lo concretó con NFS v4, con la configuración compartida en `/mnt/wp-config` (persistente mediante `/etc/fstab` y el servicio `netmount`) y los archivos multimedia en el volumen Docker `wp_uploads_shared`. Con ello ambos backends comparten además `wp-config.php`, claves y salts, que es la condición para que una sesión iniciada en un nodo valga en el otro. La implementación se apartó del diseño en la forma de exportar: el script exporta `/srv/nfs/wordpress` a toda la subred `10.33.199.48/29` con la opción `no_root_squash` y deja como propietario a `nobody:nobody`, mientras que la Entrega 1 preveía exportar solo a `.50` y `.51`, sin `no_root_squash` y con propietario `www-data` (uid 33). El acceso efectivo al puerto 2049 queda limitado a esos dos orígenes por UFW en la VM de datos, lo que atenúa la desviación sin eliminarla.
+**De archivos locales a almacenamiento compartido.** En un primer momento cada backend guardaba por su cuenta las imágenes subidas, de modo que una foto cargada a través de un nodo no existía en el otro. El diseño resolvió esto con NFS y la implementación lo concretó con NFS v4, con la configuración y los archivos multimedia expuestos a los contenedores como volúmenes Docker NFS (p. ej. `wp_uploads_shared`), sin montaje NFS en el sistema operativo de las VM de WordPress. Con ello ambos backends comparten además `wp-config.php`, claves y salts, que es la condición para que una sesión iniciada en un nodo valga en el otro. La implementación se apartó del diseño en la forma de exportar: el script exporta `/srv/nfs/wordpress` a toda la subred `10.33.199.48/29` con la opción `no_root_squash` y deja como propietario a `nobody:nobody`, mientras que la Entrega 1 preveía exportar solo a `.50` y `.51`, sin `no_root_squash` y con propietario `www-data` (uid 33). El acceso efectivo al puerto 2049 queda limitado a esos dos orígenes por UFW en la VM de datos, lo que atenúa la desviación sin eliminarla.
 
 **De una VM prevista a una pila de observabilidad con versiones y trabajos definidos.** La monitorización fue una incorporación posterior a la propuesta inicial. En la versión final quedó fijada con Prometheus v3.5.0, Alertmanager v0.28.1, Loki v3.5.0 y Grafana v11.6.0, con exporters para Nginx (1.3.0), Apache y MariaDB (v0.17.2). El exporter de Nginx se alimenta de un sitio `stub_status` accesible solo en `127.0.0.1:8081` y corre con `network_mode: host`. El de MariaDB usa un usuario `prometheus` limitado al origen `10.33.199.52`, con tres conexiones como máximo y privilegios mínimos de lectura de métricas. Cada exporter aporta una métrica de vida (`nginx_up`, `apache_up` y `mysql_up`) sobre la que se pueden construir las reglas de alerta.
 
@@ -686,7 +686,7 @@ Por último, los puntos únicos de falla identificados en la Entrega 1, el nodo 
 
 # 8. Conclusiones
 
-El proyecto Nodo Sur demostró la viabilidad de construir una infraestructura resiliente, contenerizada y observable con software libre sobre Alpine Linux. La separación de la base de datos, el uso de almacenamiento compartido NFS y la monitorización con Prometheus y Grafana otorgan una base sólida para la operación regional. La comparación con el diseño de la Entrega 1 muestra que la arquitectura se mantuvo: los cinco nodos, sus flujos y las decisiones de los ADR siguen vigentes, y los cambios fueron de implementación, principalmente la adopción de contenedores, el cambio del servidor web de los backends a Apache y la incorporación del NFS. Los respaldos avanzaron más allá de lo comprometido, con un flujo automático de dos etapas que incluye copia externa y verificación de integridad. Las diferencias relevantes están en los controles que hacen verificable la solución, como el destino de las alertas, la frecuencia de los respaldos, la restauración medida, el respaldo de los archivos del NFS, las cuentas SSH nominativas y el retiro de las IP públicas, y en tres configuraciones que conviene corregir o justificar, que son la exportación del NFS, el puerto 9104 del exporter y la recursión de BIND9.
+El proyecto Nodo Sur demostró la viabilidad de construir una infraestructura resiliente, contenerizada y observable con software libre sobre Alpine Linux (nodos de aplicación, datos y monitorización) y Ubuntu 24.04 LTS (nodo perimetral). La separación de la base de datos, el uso de almacenamiento compartido NFS y la monitorización con Prometheus y Grafana otorgan una base sólida para la operación regional. La comparación con el diseño de la Entrega 1 muestra que la arquitectura se mantuvo: los cinco nodos, sus flujos y las decisiones de los ADR siguen vigentes, y los cambios fueron de implementación, principalmente la adopción de contenedores, el cambio del servidor web de los backends a Apache y la incorporación del NFS. Los respaldos avanzaron más allá de lo comprometido, con un flujo automático de dos etapas que incluye copia externa y verificación de integridad. Las diferencias relevantes están en los controles que hacen verificable la solución, como el destino de las alertas, la frecuencia de los respaldos, la restauración medida, el respaldo de los archivos del NFS, las cuentas SSH nominativas y el retiro de las IP públicas, y en tres configuraciones que conviene corregir o justificar, que son la exportación del NFS, el puerto 9104 del exporter y la recursión de BIND9.
 
 Como trabajo futuro se contempla la separación de DNS y Nginx, la replicación de MariaDB, la ejecución y medición de la prueba de restauración, el respaldo de los archivos del NFS y de las configuraciones, y el ajuste de la frecuencia de respaldo al RPO de 24 horas.
 
@@ -718,7 +718,7 @@ Como trabajo futuro se contempla la separación de DNS y Nginx, la replicación 
 ## Anexo D — Runbook operativo
 1. **backend caído:** verificar `up` en Prometheus, reiniciar contenedor Docker o aislar temporalmente en `upstream` de Nginx.
 2. **BD caída:** revisar contenedor MariaDB, espacio en disco (`df -h`) y conexiones máximas (`max_connections`).
-3. **NFS no disponible:** verificar servicio `nfs` en `db` y punto de montaje en clientes con `df -h /mnt/wp-config`.
+3. **NFS no disponible:** verificar servicio `nfs` en `db` y los volúmenes NFS en los backends con `docker volume inspect wp_uploads_shared` y comprobando que el contenedor accede a `wp-content/uploads`.
 4. **Respaldo no generado o inválido:** revisar `/var/log/backup-db.log` en `db` y `~/pull-db.log` en el nodo perimetral, comprobar el espacio con `df -h` y verificar los checksums con `sha256sum -c *.sha256` en ambas ubicaciones.
 5. **Restauración de la base de datos (procedimiento previsto, aún no probado):** levantar un contenedor `mariadb:11` aparte, sin puertos ni volúmenes compartidos, restaurar con `gunzip -c` hacia `docker exec -i`, verificar las bases `mydb` y `mysql`, medir con `time` y eliminar el contenedor.
 6. **Pérdida de acceso por firewall:** desde la consola de la plataforma ejecutar `ufw disable`, `iptables -F INPUT` y `iptables -P INPUT ACCEPT`.
