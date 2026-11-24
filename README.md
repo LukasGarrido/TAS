@@ -49,35 +49,38 @@ nodo-sur/
 ├── README.md
 ├── assets/
 │   └── universidad-tecnica-federico-santa-maria-seeklogo.png
-├── bitacora/
+├── binnacle/
+│   ├── Infraestructura.md
 │   ├── bitacora-general.md
 │   ├── entorno-de-trabajo.md
-│   ├── Infraestructura.md
 │   └── uso-ia.md
-├── decisiones/
+├── configurations/
+│   ├── configurar-grafana-mariadb.md
+│   ├── configurar-grafana-nginx.md
+│   ├── configurar-grafana-wordpress.md
+│   ├── configurar-vm-monitoreo.md
+│   ├── grafana.json
+│   ├── respaldos-mariadb.md
+│   ├── scripts_DataBase-Grafana.md
+│   ├── scripts_docker.md
+│   ├── scripts_firewall_ufw.md
+│   ├── scripts_Servidor_NFS.md
+│   ├── scripts_wordpress.md
+│   └── tarjeta_red_cms1.md
+├── decisions/
 │   ├── ADR-001 Selección de CMS.md
 │   └── ADR-002 Nginx como balanceador en vez de HAProxy.md
-├── docs/
-│   ├── caso-de-negocio.md
-│   ├── G6_tas_NodoSur.pdf
-│   ├── plan-implementacion.md
-│   ├── Proyecto_Integrador_TAS_2026_Nodo_Sur.pdf
-│   ├── reproduccion-entorno.md
-│   ├── riesgos.md
-│   └── entrega-1/
-│       ├── Diagrama de despliegue.md
-│       ├── E1_grupo06_informe.docx
-│       └── E1_grupo06_informe.pdf
-└── scripts/
-    ├── respaldos-mariadb.md
-    ├── scripts_DataBase-Grafana.md
-    ├── scripts_docker.md
-    ├── scripts_firewall_ufw.md
-    ├── scripts_monitorización.md
-    ├── scripts_Servidor_NFS.md
-    ├── scripts_VM-Monitoreo.md
-    ├── scripts_wordpress.md
-    └── tarjeta_red_cms1.md
+└── docs/
+    ├── caso-de-negocio.md
+    ├── plan-implementacion.md
+    ├── reproduccion-entorno.md
+    ├── riesgos.md
+    ├── E01/
+    │   └── Diagrama de despliegue.md
+    └── pdf/
+        ├── E1_grupo06_informe.pdf
+        ├── G6_tas_NodoSur.pdf
+        └── Proyecto_Integrador_TAS_2026_Nodo_Sur.pdf
 ```
 
 ---
@@ -130,13 +133,14 @@ El sistema de respaldo implementa una estrategia de dos etapas que cumple con la
 
 ## 8. Referencias y Documentación Técnica
 
-Para desplegar, administrar o auditar la plataforma, consulte los manuales específicos en la carpeta `scripts/`:
-- `scripts/scripts_docker.md` — Instalación y despliegue de contenedores.
-- `scripts/scripts_Servidor_NFS.md` — Configuración del servidor y volúmenes NFS.
-- `scripts/scripts_firewall_ufw.md` — Endpoints, UFW y reglas `DOCKER-USER`.
-- `scripts/scripts_monitorización.md` — Pila Grafana, Prometheus, Loki y Alertmanager.
-- `scripts/respaldos-mariadb.md` — Arquitectura y operación de respaldos automáticos.
-- `decisiones/` — Registros de Decisiones de Arquitectura (ADR-001 y ADR-002).
+Para desplegar, administrar o auditar la plataforma, consulte los manuales específicos en la carpeta `configurations/`:
+- `configurations/scripts_docker.md` — Instalación y despliegue de contenedores.
+- `configurations/scripts_Servidor_NFS.md` — Configuración del servidor y volúmenes NFS.
+- `configurations/scripts_firewall_ufw.md` — Endpoints, UFW y reglas `DOCKER-USER`.
+- `configurations/configurar-vm-monitoreo.md` — Configuración de la VM de monitoreo.
+- `configurations/scripts_DataBase-Grafana.md` — Integración de Bases de Datos y Grafana.
+- `configurations/respaldos-mariadb.md` — Arquitectura y operación de respaldos automáticos.
+- `decisions/` — Registros de Decisiones de Arquitectura (ADR-001 y ADR-002).
 
 ---
 
