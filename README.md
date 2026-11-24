@@ -43,9 +43,10 @@ Como proveedores de infraestructura, el equipo ha justificado cada decisión té
 
 ```
 nodo-sur/
-├── README.md
+├── .gitignore
 ├── G6_tas_NodoSur.md
 ├── index.md
+├── README.md
 ├── assets/
 │   └── universidad-tecnica-federico-santa-maria-seeklogo.png
 ├── bitacora/
@@ -57,11 +58,16 @@ nodo-sur/
 │   ├── ADR-001 Selección de CMS.md
 │   └── ADR-002 Nginx como balanceador en vez de HAProxy.md
 ├── docs/
+│   ├── caso-de-negocio.md
 │   ├── G6_tas_NodoSur.pdf
+│   ├── plan-implementacion.md
 │   ├── Proyecto_Integrador_TAS_2026_Nodo_Sur.pdf
+│   ├── reproduccion-entorno.md
+│   ├── riesgos.md
 │   └── entrega-1/
 │       ├── Diagrama de despliegue.md
-│       └── E1_grupo06_informe.docx
+│       ├── E1_grupo06_informe.docx
+│       └── E1_grupo06_informe.pdf
 └── scripts/
     ├── respaldos-mariadb.md
     ├── scripts_DataBase-Grafana.md
