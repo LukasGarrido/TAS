@@ -95,6 +95,8 @@ receivers:
 EOF
 ```
 
+> Esta es la configuración inicial. El envío a Discord y las reglas actuales están en [Configurar alertas](configurar-alertas.md).
+
 ## 5. Configuración de Loki
 
 Archivo `loki/loki.yml`:

@@ -9,7 +9,7 @@
 | Acceso directo a un backend que elude el punto de entrada (puerto 8080 abierto y IP pública en CMS 1, CMS 2, monitor y BD) | Alta | Medio | Dejar cada VM con una sola tarjeta (privada), publicar en IP privada y restringir en `DOCKER-USER`. |
 | Endpoints de estado y métricas expuestos (`/server-status`, exporters, BIND9) | Alta | Medio | Restringir `/server-status` a la red interna de Docker, limitar los exporters al origen `10.33.199.52` y dejar BIND9 en `127.0.0.1`. |
 | Resolvedor DNS abierto (recursión para cualquier origen) | Alta | Medio | Limitar `allow-recursion` y `allow-query-cache` a `10.33.199.48/29` y verificar `REFUSED` desde fuera. |
-| Alertas sin destino: una falla no avisa a nadie | Alta | Alto | Definir el receptor de Alertmanager y regla `up == 0` para todos los jobs. |
+| Pérdida de avisos: Prometheus y Alertmanager viven en `monitor` y el único destino es Discord; si cae esa VM o su salida a internet, nadie es avisado | Media | Alto | Vigilancia externa de la VM `monitor`, un segundo canal de aviso y pruebas periódicas de entrega. |
 | Falla no detectada a tiempo por health checks pasivos | Media | Alto | Script de comprobación activa con alerta y monitorización. |
 | Pérdida de datos por una operación destructiva sin respaldo previo | Media | Alto | Dump antes de `docker compose down -v` y backups automatizados. |
 | Respaldos solo manuales, en la misma VM y sin restauración probada | Alta | Alto | Prueba de restauración en un contenedor aparte, copia en el nodo perimetral, automatización con retención de 30 días y medición de RPO y RTO. |

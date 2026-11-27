@@ -17,8 +17,8 @@ Los exporters actuales miden **servicios** (Nginx, Apache, MariaDB). Para medir 
 | `node_exporter` en las cinco VMs | Aplicado (Alpine: 1.11.1; Ubuntu: 1.7.0) |
 | Job `node` en Prometheus | Aplicado: los cinco targets responden `up = 1` |
 | Dashboard **Nodo Sur - Máquinas** | Importado en Grafana |
-| Reglas de alerta `maquinas.yml` | **Pendiente** |
-| Prueba de caída | **Pendiente** |
+| Reglas de alerta `maquinas.yml` | Aplicadas (ver [alertas](configurar-alertas.md)) |
+| Prueba de caída en `cms-2` | La alerta llegó a Discord |
 
 ## 1. Instalar node_exporter
 
@@ -172,69 +172,13 @@ El dashboard **Nodo Sur - Máquinas** (`nodo-sur-maquinas`) muestra:
 | Carga del sistema | Carga promedio de 1 minuto |
 | Red recibida / enviada | Tráfico por VM, sin interfaces de Docker |
 
-## 6. Agregar las alertas (pendiente de aplicar)
+## 6. Alertas
 
-En `/opt/nodo-sur-monitoring/prometheus/rules/` crear el archivo `maquinas.yml`:
-
-```sh
-cat > /opt/nodo-sur-monitoring/prometheus/rules/maquinas.yml <<'EOF'
-groups:
-  - name: maquinas
-    rules:
-      - alert: MaquinaCaida
-        expr: up{job="node"} == 0
-        for: 1m
-        labels:
-          severity: critical
-        annotations:
-          summary: "La VM {{ $labels.host }} no responde"
-          description: "Prometheus no puede consultar node_exporter en {{ $labels.instance }}."
-
-      - alert: CpuAlta
-        expr: 100 * (1 - avg by (host) (rate(node_cpu_seconds_total{job="node", mode="idle"}[5m]))) > 85
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "CPU sobre 85% en {{ $labels.host }}"
-
-      - alert: MemoriaAlta
-        expr: 100 * (1 - node_memory_MemAvailable_bytes{job="node"} / node_memory_MemTotal_bytes{job="node"}) > 90
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Memoria sobre 90% en {{ $labels.host }}"
-
-      - alert: DiscoLleno
-        expr: 100 * (1 - node_filesystem_avail_bytes{job="node", mountpoint="/"} / node_filesystem_size_bytes{job="node", mountpoint="/"}) > 85
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Disco raíz sobre 85% en {{ $labels.host }}"
-EOF
-```
-
-Validar y reiniciar como en el paso 4. La validación debe informar `4 rules found` para `maquinas.yml`.
-
-## 7. Prueba de caída (pendiente de ejecutar)
-
-Detener el exporter en una VM Alpine, por ejemplo `cms-2`:
-
-```sh
-rc-service node-exporter stop
-```
-
-En un par de minutos `cms-2` debe aparecer en `DOWN` y la alerta `MaquinaCaida` en `firing`. Volver a levantarlo:
-
-```sh
-rc-service node-exporter start
-```
+Las reglas de máquinas, el envío a Discord y la prueba de caída se describen en [Configurar alertas](configurar-alertas.md).
 
 > `DOWN` significa que Prometheus no logra consultar el exporter: la VM puede estar apagada, sin red, con el puerto bloqueado o con el exporter detenido.
 
-## 8. Problemas encontrados
+## 7. Problemas encontrados
 
 | Síntoma | Causa | Solución |
 |---|---|---|

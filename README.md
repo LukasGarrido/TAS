@@ -54,6 +54,10 @@ nodo-sur/
 │   ├── entorno-de-trabajo.md
 │   └── uso-ia.md
 ├── configurations/
+│   ├── configurar-alertas.md
+│   ├── prometheus-rules/
+│   │   ├── maquinas.yml
+│   │   └── servicios.yml
 │   ├── configurar-grafana-maquinas.md
 │   ├── grafana-maquinas.json
 │   ├── configurar-grafana-mariadb.md
@@ -111,7 +115,7 @@ La plataforma opera en la subred `10.33.199.48/29` y se compone de cinco máquin
 | RNF-02 | Base de datos independiente y no expuesta | NF | [Implementado] MariaDB en VM dedicada; puerto 3306 restringido por UFW y `DOCKER-USER`. |
 | RNF-03 | Persistencia y coherencia del estado compartido | NF | [Implementado] Servidor NFS en `/srv/nfs/wordpress` con volúmenes Docker NFS v4. |
 | RNF-04 | Administración remota segura y nominativa | NF | [Parcial] SSH por clave pública y salto por bastión; llave dedicada `id_pull` para respaldos. |
-| RNF-05 | Detección de falla crítica en tiempo acotado | NF | [Parcial] Stack Prometheus/Alertmanager configurado; pendiente definir destino de alertas. |
+| RNF-05 | Detección de falla crítica en tiempo acotado | NF | [Parcial] Alertas de máquinas y servicios enviadas a Discord; probada la caída de un exporter. Falta medir el tiempo de detección. |
 | RNF-06 | Continuidad mediante respaldos verificados | NF | [Implementado] Dump automático cada 2 días con gzip y SHA-256 en `db`, con copia externa diaria en nodo perimetral (retención 30 días). |
 | RNF-07 | Dominio único con HTTPS válido | NF | [Implementado] `https://tas-06.arpa` con Nginx TLS y redirección HTTP. |
 | RNF-08 | Trazabilidad y hora consistente | NF | [Parcial] NTP y Loki configurados; diferencias de zona horaria entre VMs y contenedores documentadas. |
@@ -189,6 +193,7 @@ Para desplegar, administrar o auditar la plataforma, consulte los manuales espec
 - `configurations/scripts_firewall_ufw.md` — Endpoints, UFW y reglas `DOCKER-USER`.
 - `configurations/configurar-vm-monitoreo.md` — Configuración de la VM de monitoreo.
 - `configurations/configurar-grafana-maquinas.md` — Monitoreo de las máquinas con `node_exporter`.
+- `configurations/configurar-alertas.md` — Reglas de alerta y envío a Discord.
 - `configurations/scripts_DataBase-Grafana.md` — Integración de Bases de Datos y Grafana.
 - `configurations/respaldos-mariadb.md` — Arquitectura y operación de respaldos automáticos.
 - `decisions/` — Registros de Decisiones de Arquitectura (ADR-001 y ADR-002).
@@ -212,6 +217,9 @@ Documentación, bitácoras, configuraciones y registros de arquitectura del repo
   - [`uso-ia.md`](binnacle/uso-ia.md)
 
 - **[configurations/](configurations/)** — Scripts y manuales de configuración de servicios:
+  - [`configurar-alertas.md`](configurations/configurar-alertas.md)
+  - [`prometheus-rules/maquinas.yml`](configurations/prometheus-rules/maquinas.yml)
+  - [`prometheus-rules/servicios.yml`](configurations/prometheus-rules/servicios.yml)
   - [`configurar-grafana-maquinas.md`](configurations/configurar-grafana-maquinas.md)
   - [`grafana-maquinas.json`](configurations/grafana-maquinas.json)
   - [`configurar-grafana-mariadb.md`](configurations/configurar-grafana-mariadb.md)

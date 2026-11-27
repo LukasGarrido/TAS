@@ -104,7 +104,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "mysql_up{instance=~\"$instance\"}",
+          "expr": "min by (instance) (mysql_up{instance=~\"$instance\"} or up{job=\"mariadb\", instance=~\"$instance\"} * 0)",
           "legendFormat": "MariaDB status",
           "range": true,
           "refId": "A"
@@ -183,7 +183,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "apache_up{replica=~\"$replica\"}",
+          "expr": "min by (replica) (apache_up{replica=~\"$replica\"} or up{job=\"apache-wordpress\", replica=~\"$replica\"} * 0)",
           "legendFormat": "{{replica}}",
           "range": true,
           "refId": "A"
@@ -1301,7 +1301,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "nginx_up{instance=\"10.33.199.49:9113\"}",
+          "expr": "min by (instance) (nginx_up{instance=\"10.33.199.49:9113\"} or up{instance=\"10.33.199.49:9113\"} * 0)",
           "legendFormat": "nginx status",
           "range": true,
           "refId": "A"
@@ -1602,7 +1602,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "bind_up{instance=\"10.33.199.49:9119\"}",
+          "expr": "min by (instance) (bind_up{instance=\"10.33.199.49:9119\"} or up{instance=\"10.33.199.49:9119\"} * 0)",
           "legendFormat": "BIND9 status",
           "range": true,
           "refId": "A"

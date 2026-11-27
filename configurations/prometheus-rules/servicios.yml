@@ -1,0 +1,75 @@
+groups:
+  - name: servicios
+    rules:
+      - alert: ExporterCaido
+        expr: up{job!~"node|prometheus"} == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "Sin métricas de {{ $labels.job }} ({{ $labels.instance }})"
+      - alert: SitioCaido
+        expr: probe_success{job="blackbox-wordpress"} == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "El sitio {{ $labels.instance }} no responde"
+      - alert: SitioLento
+        expr: probe_duration_seconds{job="blackbox-wordpress"} > 3
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "El sitio tarda más de 3 s en responder"
+      - alert: CertificadoPorVencer
+        expr: probe_ssl_earliest_cert_expiry{job="blackbox-wordpress"} - time() < 14 * 86400
+        for: 1h
+        labels: {severity: warning}
+        annotations:
+          summary: "El certificado del sitio vence en menos de 14 días"
+      - alert: NginxCaido
+        expr: nginx_up == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "Nginx no responde"
+      - alert: ApacheCaido
+        expr: apache_up == 0
+        for: 1m
+        labels: {severity: warning}
+        annotations:
+          summary: "Apache caído en {{ $labels.replica }}"
+      - alert: SinReplicasWeb
+        expr: sum(apache_up) == 0 or absent(apache_up)
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "No hay ninguna réplica web disponible"
+      - alert: ApacheSaturado
+        expr: sum by (replica) (apache_workers{state="busy"}) / sum by (replica) (apache_workers{state=~"busy|idle"}) > 0.9
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Más del 90% de workers ocupados en {{ $labels.replica }}"
+      - alert: MariaDBCaida
+        expr: mysql_up == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "MariaDB no responde"
+      - alert: ConexionesMariaDBAltas
+        expr: mysql_global_status_threads_connected / mysql_global_variables_max_connections > 0.8
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "MariaDB usa más del 80% de sus conexiones"
+      - alert: ConsultasLentas
+        expr: increase(mysql_global_status_slow_queries[5m]) > 10
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Aumento de consultas lentas en MariaDB"
+      - alert: DNSCaido
+        expr: bind_up == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "BIND9 no responde"

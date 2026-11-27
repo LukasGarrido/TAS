@@ -1,0 +1,27 @@
+groups:
+  - name: maquinas
+    rules:
+      - alert: MaquinaCaida
+        expr: up{job="node"} == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "La VM {{ $labels.host }} no responde"
+      - alert: CpuAlta
+        expr: 100 * (1 - avg by (host) (rate(node_cpu_seconds_total{job="node", mode="idle"}[5m]))) > 85
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "CPU sobre 85% en {{ $labels.host }}"
+      - alert: MemoriaAlta
+        expr: 100 * (1 - node_memory_MemAvailable_bytes{job="node"} / node_memory_MemTotal_bytes{job="node"}) > 90
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Memoria sobre 90% en {{ $labels.host }}"
+      - alert: DiscoLleno
+        expr: 100 * (1 - node_filesystem_avail_bytes{job="node", mountpoint="/"} / node_filesystem_size_bytes{job="node", mountpoint="/"}) > 85
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Disco raíz sobre 85% en {{ $labels.host }}"

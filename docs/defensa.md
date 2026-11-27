@@ -45,10 +45,10 @@ Los comandos están basados en la documentación del repositorio. Lo que **no es
 - [ ] Todas las VM encendidas y accesibles por SSH (bastión `.49`).
 - [ ] Cliente de demostración definido, con su DNS apuntando a `10.33.199.49` (o entrada en `hosts` si va por VPN, ver 3.4).
 - [ ] Cada integrante tiene su pestaña de terminal abierta en la VM que le toca.
-- [ ] Grafana abierto con el dashboard de MariaDB, Nginx y WordPress; Alertmanager (`:9093`) y Loki (Explore en Grafana) abiertos. Acceso por túnel SSH (los puertos no son públicos).
+- [ ] Grafana abierto con los dashboards de servicios (`nodo-sur-overview`) y de máquinas (`nodo-sur-maquinas`); Alertmanager (`:9093`), Loki (Explore en Grafana) y el canal de alertas de Discord abiertos. Acceso por túnel SSH (los puertos no son públicos).
 - [ ] **Respaldo reciente identificado** (ver 5.1). Los dumps automáticos son cada 2 días a las 02:30 (hora Chile); hoy el automático corre el **24/nov**, pero un dato creado después no estaría en él, por eso se hace un respaldo manual.
 - [ ] **Dato de prueba creado antes del respaldo** (ver 5.1).
-- [ ] Reglas de alerta y receptor de Alertmanager funcionando (ver sección 8, es el pendiente más importante).
+- [ ] Reglas de alerta cargadas (17) y envío a Discord probado ese mismo día (ver [Configurar alertas](../configurations/configurar-alertas.md)).
 - [ ] Relojes sincronizados: `chronyc tracking` y `date` en todos los nodos.
 - [ ] Guion cronometrado y reparto de roles ensayado al menos una vez completa, **incluida la restauración con `time`**.
 
@@ -98,7 +98,7 @@ showmount -e localhost                    # exportación NFS
 docker ps --format 'table {{.Names}}\t{{.Status}}'
 ```
 
-Además, en Prometheus (`:9090/targets`) todos los targets deben estar en **UP**: `nginx-lb`, `apache-wordpress`, `blackbox-wordpress`, `mariadb`, `prometheus`.
+Además, en Prometheus (`:9090/targets`) todos los targets deben estar en **UP**: `node` (cinco VMs), `nginx-lb`, `bind9-dns`, `apache-wordpress`, `blackbox-wordpress`, `mariadb`, `prometheus`.
 
 ### 3.3 Operación funcional que depende de la BD
 
@@ -183,7 +183,7 @@ Mostrar y **anotar la hora** (con zona):
 | Targets | Prometheus `:9090/targets` | Todos UP |
 | Códigos HTTP de Nginx | Dashboard Nginx / logs | 200 |
 | Logs | Loki en Grafana Explore | Sin errores de BD |
-| Alertas | Alertmanager `:9093` | Sin alertas activas |
+| Alertas | Alertmanager `:9093` y canal de Discord | Sin alertas activas |
 
 ### 5.1 Preparación del dato de prueba y del respaldo (**antes** de la falla)
 
@@ -242,7 +242,7 @@ Evidencia: código HTTP de error / mensaje "Error establishing a database connec
 | **Métricas** | `mysql_up` pasa de 1 a 0; target `mariadb` DOWN | Grafana/Prometheus, ajustar el rango a ±10 min |
 | **Métricas** | Aumento de 5xx en Nginx / `blackbox-wordpress` en `probe_success = 0` | Dashboard Nginx / WordPress |
 | **Logs** | Errores de conexión a la BD en los WordPress; 5xx en el access log de Nginx; log de Docker de `mariadb` mostrando el apagado | Loki en Grafana Explore (filtrar por host y por texto `database`/`error`) |
-| **Alertas** | Alerta activa en Alertmanager (`:9093`) con `startsAt` | Alertmanager UI |
+| **Alertas** | `MariaDBCaida` activa en Alertmanager (`:9093`) con `startsAt`, y mensaje en Discord | Alertmanager UI y Discord |
 
 Consultas útiles:
 
@@ -273,11 +273,11 @@ sudo tail -20 /var/log/nginx/error.log; sudo tail -20 /var/log/nginx/access.log
 - [ ] Prueba fallida desde el cliente (con hora).
 - [ ] Gráfico de métricas con el cambio y hora.
 - [ ] Logs con marcas de tiempo.
-- [ ] Alerta activa (o, si no llega, explicar por qué; ver sección 8).
+- [ ] Alerta activa y mensaje recibido en Discord, con hora (si no llega, ver sección 10).
 
 ### 5.7 Preguntas probables
 
-- ¿Cuánto tardó la alerta en dispararse y por qué? → depende de `scrape_interval` (30 s), `evaluation_interval` (30 s) y `for:` de la regla, más `group_wait` (10 s) de Alertmanager. RNF-05 exige ≤ 5 min.
+- ¿Cuánto tardó la alerta en dispararse y por qué? → depende de `scrape_interval` (30 s), `evaluation_interval` (30 s) y `for:` de la regla (1 min en `MariaDBCaida`), más `group_wait` (10 s) de Alertmanager. RNF-05 exige ≤ 5 min.
 - ¿Por qué el balanceador no ayuda aquí? → El balanceo protege la capa web, no la BD; la BD es un punto único de falla (RNF-02 solo la aísla, no la replica).
 - ¿Qué diferencia hay entre una alerta de métrica y un log? → La métrica dice *que* algo cambió y *cuándo*; el log explica *por qué*.
 
@@ -387,7 +387,7 @@ date -u
 | Operación que falló | Funciona de nuevo |
 | Dato restaurado | `SELECT * FROM defensa_test;` devuelve la fila |
 | Métricas | `mysql_up = 1`, targets UP, 5xx de Nginx vuelve a 0 |
-| Alerta | Pasa a *resolved* en Alertmanager (`endsAt`) |
+| Alerta | Pasa a *resolved* en Alertmanager (`endsAt`) y llega el aviso `RESOLVED` a Discord |
 | Logs | Se ve el reinicio de MariaDB y el retorno de 200 |
 
 Cerrar con una **línea de tiempo** del incidente (en un solo slide o en la terminal):
@@ -421,7 +421,7 @@ Cada integrante **ejecuta o interpreta una prueba** y responde **una pregunta**.
 - ¿Por qué Nginx y no HAProxy? ¿Qué se pierde? (Health checks activos y panel de estadísticas.)
 - ¿Qué verifica RNF-05 y cómo se mide? ¿Cumple hoy? (Ver sección 8.)
 - ¿Qué riesgo tiene que las zonas horarias difieran entre VM y contenedores? (Correlación de logs, RNF-08.)
-- ¿Qué expone cada exporter y cómo se limita? (UFW/origen `10.33.199.52`; `mysqld-exporter` escucha en `0.0.0.0:9104`, ver riesgos.)
+- ¿Qué expone cada exporter y cómo se limita? (UFW/origen `10.33.199.52`; `mysqld-exporter` escucha en `0.0.0.0:9104`, ver riesgos. En `dns` UFW está inactivo y `node_exporter` escucha solo en la IP privada.)
 - ¿Qué pasa con los respaldos si el cron falla en silencio? (Hoy solo hay logs; no hay alerta de respaldo faltante.)
 - ¿Cómo se restaura un nodo CMS? (Docker + compose + `wp-config.php` por NFS + montaje NFS: [reproducción del entorno](reproduccion-entorno.md).)
 
@@ -433,8 +433,8 @@ Estos puntos salen de contrastar la rúbrica con lo documentado en el repositori
 
 | # | Brecha | Por qué importa | Acción |
 |---|---|---|---|
-| 1 | **Alertas sin destino**: `alertmanager.yml` define el receptor `laboratorio` sin ningún canal (ni correo ni webhook). | La rúbrica pide ver "alertas configuradas". Sin receptor la alerta se ve en la UI de Alertmanager pero no llega a nadie (RNF-05). | Definir un webhook/correo, o al menos demostrar la alerta *firing* en `:9093`. |
-| 2 | **Solo existe una regla**: `PrometheusTargetDown` sobre `job="prometheus"`. | No detecta la caída de MariaDB. | Agregar reglas, p. ej. `mysql_up{job="mariadb"} == 0` (for 1m, critical), `up == 0` para todos los jobs y `probe_success == 0` del blackbox. |
+| 1 | **Tiempo de detección sin medir**: las alertas llegan a Discord (probado deteniendo `node_exporter` en `cms-2`), pero no se cronometró ni se probó la caída de un servicio. | RNF-05 exige alerta en ≤ 5 min tras detener un backend. | Detener un backend y MariaDB, anotar hora de la falla, hora del mensaje y confirmar `RESOLVED`. |
+| 2 | **UFW inactivo en `dns`**, aunque el README indica que está activo en las VMs. | Pregunta probable de seguridad; el nodo tiene la IP pública. | Activar UFW con las reglas de SSH, DNS, web y exporters, o corregir la documentación. |
 | 3 | **Agente de logs hacia Loki no documentado** (Promtail/Alloy). | Sin él, no hay logs que mostrar de la caída. | Confirmar qué agente corre y qué etiquetas usa; probar una consulta LogQL de ensayo. |
 | 4 | **Archivo de zona DNS** (ruta y contenido) no está en el repositorio. | Etapa 2 exige mostrar el registro A. | Documentar el archivo y dejar el `dig` de referencia en `configurations/`. |
 | 5 | **Restauración "prevista, aún no probada"** según `respaldos-mariadb.md` sección 7. | Es la etapa con mayor riesgo de tiempo. | Ensayar completa antes, medir `time` y anotarlo. |
@@ -466,7 +466,7 @@ Estos puntos salen de contrastar la rúbrica con lo documentado en el repositori
 
 | Si pasa... | Haz... |
 |---|---|
-| La alerta no llega | Mostrar la regla, la expresión en Prometheus (`/alerts`) y el estado *pending/firing*; explicar el pendiente 1 con honestidad. |
+| La alerta no llega | Mostrar la regla y su estado *pending/firing* en Prometheus (`/alerts`), consultar Alertmanager y sus registros (ver [diagnóstico](../configurations/configurar-alertas.md)). |
 | `docker start mariadb` no levanta | `docker logs mariadb`; si el volumen está dañado, ir directo a la restauración en contenedor nuevo. |
 | La restauración tarda más de lo esperado | Mostrar el avance (`SHOW PROCESSLIST;`) y comparar con el objetivo de RNF-06 (≤ 60 min). |
 | `tas-06.arpa` no resuelve en el cliente | Usar `dig @10.33.199.49` para demostrar el DNS y la entrada en `hosts` para abrir el sitio (ver 3.4). |
@@ -482,6 +482,7 @@ Estos puntos salen de contrastar la rúbrica con lo documentado en el repositori
 - [Informe final](E05/G6_tas_NodoSur.md)
 - [Respaldos de MariaDB](../configurations/respaldos-mariadb.md)
 - [Configuración de la VM de monitoreo](../configurations/configurar-vm-monitoreo.md)
+- [Configurar alertas](../configurations/configurar-alertas.md) · [Monitoreo de las máquinas](../configurations/configurar-grafana-maquinas.md)
 - [Grafana + MariaDB](../configurations/configurar-grafana-mariadb.md), [Nginx](../configurations/configurar-grafana-nginx.md), [WordPress](../configurations/configurar-grafana-wordpress.md)
 - [Riesgos](riesgos.md) · [Plan de implementación](plan-implementacion.md) · [Reproducción del entorno](reproduccion-entorno.md)
 - [ADR-002: Nginx en vez de HAProxy](../decisions/ADR-002%20Nginx%20como%20balanceador%20en%20vez%20de%20HAProxy.md)
