@@ -22,8 +22,8 @@ Asignatura: EIN-090B · Taller de Administración de Sistemas (TAS)
 | **Integrantes** | Josecarlos Vidal <br> Octavio Valencia <br> Lukas Garrido |
 | **Equipo** | Grupo 06 (`tas-06`) |
 | **Profesor** | Jose Anotino Arellano |
-| **Fecha** | 23 de noviembre de 2026 |
-| **Versión del documento** | v4.0 |
+| **Fecha** | 27 de noviembre de 2026 |
+| **Versión del documento** | v4.1 |
 | **Repositorio** | [NodoSur](https://github.com/LukasGarrido/TAS) |
 
 </div>
@@ -68,12 +68,12 @@ A la fecha de la entrega final, la arquitectura, el modelo de seguridad, la pers
 5. [Observabilidad y Continuidad Operacional (Entrega 4)](#5-observabilidad-y-continuidad-operacional-entrega-4)
    - [5.1 Pila de monitorización y métricas](#51-pila-de-monitorización-y-métricas)
    - [5.2 Alertas y trazabilidad de logs](#52-alertas-y-trazabilidad-de-logs)
-   - [5.3 Respaldo automático de MariaDB](#53-respaldo-automático-de-mariadb)
+   - [5.3 Respaldos automáticos de MariaDB y copia externa](#53-respaldos-automáticos-de-mariadb-y-copia-externa)
 6. [Incidente, Auditoría y Defensa Final (Entrega 5)](#6-incidente-auditoría-y-defensa-final-entrega-5)
 7. [Análisis Integrado de la Solución](#7-análisis-integrado-de-la-solución)
    - [7.1 Cumplimiento de requerimientos](#71-cumplimiento-de-requerimientos)
    - [7.2 Análisis comparativo: diseño de la Entrega 1 frente a la arquitectura final](#72-análisis-comparativo-diseño-de-la-entrega-1-frente-a-la-arquitectura-final)
-8. [Conclusiones](#8-conclusiones-y-trabajo-futuro)
+8. [Conclusiones](#8-conclusiones)
 9. [Referencias](#9-referencias)
 10. [Anexos](#10-anexos)
     - [Anexo A — Matriz de trazabilidad](#anexo-a--matriz-de-trazabilidad)
@@ -227,6 +227,8 @@ Se compararon WordPress, Joomla y Drupal (decisión formal en **ADR-001**, aprob
 
 **Figura 1.** Diagrama de despliegue (subred `10.33.199.48/29`, dominio `tas-06.arpa`).
 
+Para mayor claridad, la figura omite las consultas del monitor a `node_exporter` (9100) en las cinco VM y al exporter de BIND9 (9119), detalladas en la Tabla 3.
+
 ```mermaid
 flowchart LR
     cliente(["Cliente"])
@@ -281,6 +283,10 @@ flowchart LR
 | Monitor (.52) | MariaDB (.53) | 3306 | TCP | `mysqld-exporter` (puerto 9104) con usuario de solo métricas |
 | Monitor (.52) | Nginx (.49) | 9113 | HTTP | `nginx-prometheus-exporter` |
 | Monitor (.52) | CMS 1 y CMS 2 | 9117 | HTTP | `apache-exporter` |
+| Monitor (.52) | Nodo perimetral (.49) | 9119 | HTTP | Exporter de BIND9 (`job: bind9-dns`) |
+| Monitor (.52) | Las cinco VM | 9100 | HTTP | `node_exporter`, estado de cada máquina |
+| Nginx (.49) | Monitor (.52) | 3000 | HTTP | Acceso a Grafana por `grafana.tas-06.arpa` |
+| Monitor (.52) | Discord (externo) | 443 | HTTPS | Envío de alertas desde Alertmanager |
 | Administrador | Nodo perimetral (IP pública .184) | 22 | SSH | Único punto de entrada administrativo (bastión) |
 | Nodo perimetral | Demás nodos (IP privadas) | 22 | SSH | Administración nominativa con salto (`ssh -J`) |
 | Nodo perimetral (.49) | VM `db` (.53) | 22 | SSH/SCP | Copia diaria de respaldos con el usuario `database` y una llave restringida (`from`, `restrict`) |
@@ -302,11 +308,11 @@ flowchart LR
 
 | VM (Hostname) | Nodo | Rol y servicios | IP privada | IP pública / Red | SO y versión |
 |---|---|---|---|---|---|
-| `dns` | Perimetral | DNS (BIND9, puerto 53), Nginx (80/443), bastión SSH, `nginx-exporter` (9113), copia externa de respaldos (`pull-db.sh`) | `10.33.199.49` | `10.33.195.184` | Ubuntu 24.04 LTS (88 GB libres) |
-| `cms-1` | CMS 1 | WordPress (`wordpress:php8.3-apache`, 8080), `apache-exporter` (9117) | `10.33.199.51` | Pública a retirar | Alpine Linux, Docker |
-| `cms-2` | CMS 2 | WordPress (`wordpress:php8.3-apache`, 8080), `apache-exporter` (9117) | `10.33.199.50` | Pública a retirar | Alpine Linux, Docker |
-| `db` | Datos | MariaDB 11 (3306), Servidor NFS (`/srv/nfs/wordpress`, 2049) | `10.33.199.53` | Pública a retirar | Alpine Linux, Docker (191,7 GB disco) |
-| `monitor` | Monitorización | Prometheus (9090), Alertmanager (9093), Loki (3100), Grafana (3000), `mysqld-exporter` (9104) | `10.33.199.52` | Pública a retirar | Alpine Linux 3.24.2, Docker v29.8.1, Compose v5.1.4 (191,6 GB disco) |
+| `dns` | Perimetral | DNS (BIND9, puerto 53), Nginx (80/443), bastión SSH, `nginx-exporter` (9113), copia externa de respaldos (`pull-db.sh`), exporter de BIND9 (9119), `node_exporter` (9100) | `10.33.199.49` | `10.33.195.184` | Ubuntu 24.04 LTS (88 GB libres) |
+| `cms-1` | CMS 1 | WordPress (`wordpress:php8.3-apache`, 8080), `apache-exporter` (9117), `node_exporter` (9100) | `10.33.199.51` | Pública a retirar | Alpine Linux, Docker |
+| `cms-2` | CMS 2 | WordPress (`wordpress:php8.3-apache`, 8080), `apache-exporter` (9117), `node_exporter` (9100) | `10.33.199.50` | Pública a retirar | Alpine Linux, Docker |
+| `db` | Datos | MariaDB 11 (3306), Servidor NFS (`/srv/nfs/wordpress`, 2049), `node_exporter` (9100) | `10.33.199.53` | Pública a retirar | Alpine Linux, Docker (191,7 GB disco) |
+| `monitor` | Monitorización | Prometheus (9090), Alertmanager (9093), Loki (3100), Grafana (3000), `mysqld-exporter` (9104), `node_exporter` (9100) | `10.33.199.52` | Pública a retirar | Alpine Linux 3.24.2, Docker v29.8.1, Compose v5.1.4 (191,6 GB disco) |
 
 ## 3.2 Almacenamiento y permisos (NFS)
 
@@ -359,7 +365,7 @@ En la VM `db` el procedimiento documentado deja UFW con política `deny incoming
 
 El procedimiento incluye medidas de reversión. Antes de activar UFW se arma un temporizador de seguridad de 5 minutos que lo desactiva si algo sale mal, sin tocar `DOCKER-USER` para no abrir el 3306. Además se mantiene una secuencia de emergencia por la consola de la plataforma. Antes de dar por cerrado el cambio se prueba una segunda sesión SSH desde el bastión, un intento desde otra VM que debe fallar por tiempo de espera, la lista de reglas con `iptables -L DOCKER-USER -n -v --line-numbers` y la conectividad al 3306 con `nc` desde cada origen, además de una prueba de reinicio.
 
-Los puertos de los backends siguen el mismo patrón, con el 8080 permitido solo desde el nodo perimetral y el 9117 solo desde el monitor. La documentación del repositorio registra esa extensión como recomendación y no como cambio aplicado y verificado en `cms-1`, `cms-2` y `monitor`.
+Los puertos de los backends siguen el mismo patrón, con el 8080 permitido solo desde el nodo perimetral y el 9117 solo desde el monitor. En la revisión del 27/11 se comprobó que `cms-2` tiene UFW activo con esas reglas (además del 22 y el 80 desde el nodo perimetral) y que `monitor` tiene UFW activo con el 22, el 3000 y el 9115 permitidos desde el nodo perimetral. El puerto 9100 se permitió solo desde el monitor en `cms-1`, `cms-2` y `db`, y desde las redes de Docker en `monitor`. En el nodo perimetral UFW está **inactivo**, por lo que su `node_exporter` se configuró para escuchar solo en la IP privada.
 
 ---
 
@@ -367,26 +373,106 @@ Los puertos de los backends siguen el mismo patrón, con el 8080 permitido solo 
 
 ## 5.1 Pila de monitorización y métricas
 
-La VM `monitor` ejecuta el stack de observabilidad con puertos enlazados estrictamente a `127.0.0.1`. El acceso de los administradores se realiza mediante reenvío de puertos SSH (`AllowTcpForwarding local`).
+La VM `monitor` (`10.33.199.52`) concentra la observabilidad en Docker Compose (`/opt/nodo-sur-monitoring`).
 
-| Componente | Exporter / Fuente | Puerto | Métrica clave / Job |
+### Componentes
+
+| Componente | Versión | Puerto | Función |
 |---|---|---|---|
-| Proxy Nginx | `nginx-prometheus-exporter` 1.3.0, alimentado por `stub_status` en `127.0.0.1:8081` | 9113 | `nginx_up`, conexiones activas (`job: nginx-lb`) |
-| Backends Apache | `apache-exporter` | 9117 | `apache_up`, workers ocupados |
-| Base de datos MariaDB | `prom/mysqld-exporter` v0.17.2 | 9104 | `mysql_up`, conexiones, consultas (`job: mariadb`) |
-| DNS BIND9 | Canal de estadísticas en `127.0.0.1:8053`, sin exporter | 8053 | Pendiente de conectar a Prometheus |
-| Monitorización central | Prometheus / Grafana / Loki | 9090 / 3000 / 3100 | Métricas de infraestructura, paneles y logs centralizados |
+| Prometheus | v3.5.0 | 9090 | Recolecta métricas cada 30 s, las retiene 7 días y evalúa las reglas |
+| Alertmanager | v0.28.1 | 9093 | Agrupa las alertas y las envía a Discord |
+| Grafana | v11.6.0 | 3000 | Dashboards |
+| Loki | v3.5.0 | 3100 | Logs, con retención de 7 días |
 
-**Nginx.** Se habilita un sitio exclusivo en `127.0.0.1:8081` con `stub_status` y acceso permitido solo desde el propio nodo. El exporter corre como contenedor con `network_mode: host` en el nodo perimetral para alcanzar esa dirección local y expone sus métricas en el puerto 9113. Prometheus lo consulta en `10.33.199.49:9113` con el job `nginx-lb`. La verificación consiste en consultar `nginx_status` y `/metrics` (donde `nginx_up` debe valer 1) y en comprobar el estado `UP` del objetivo en Prometheus.
+### Fuentes de métricas
 
-**MariaDB.** Se crea el usuario `prometheus`, restringido al origen `10.33.199.52`, con un máximo de tres conexiones y los privilegios mínimos `PROCESS`, `REPLICATION CLIENT` y `SELECT`. Las credenciales viven en `mysqld-exporter/.my.cnf` con permisos 600 y fuera del repositorio. El servicio se agrega al compose de `/opt/nodo-sur-monitoring` y el job `mariadb` apunta a `mysqld-exporter:9104` dentro de la red de Compose. La verificación comprueba que `mysql_up` valga 1, que el objetivo esté en `UP` y que ya no existan rechazos (`Access denied`) en los registros de MariaDB. En Grafana se crea una fuente de datos de tipo Prometheus y un panel con la consulta `mysql_up`.
+| Job | Exporter y ubicación | Puerto | Qué mide |
+|---|---|---|---|
+| `prometheus` | El propio Prometheus | 9090 | Estado de la recolección |
+| `node` | `node_exporter` en las cinco VM (1.11.1 en Alpine, 1.7.0 en Ubuntu) | 9100 | VM disponible, CPU, memoria, disco y red |
+| `nginx-lb` | `nginx-prometheus-exporter` 1.3.0 en `dns` | 9113 | `nginx_up`, conexiones y solicitudes |
+| `apache-wordpress` | `apache-exporter` en `cms-1` y `cms-2` | 9117 | `apache_up`, solicitudes, tráfico y workers |
+| `mariadb` | `mysqld-exporter` v0.17.2 en `monitor` | 9104 | `mysql_up`, conexiones y consultas |
+| `bind9-dns` | Exporter de BIND9 en `dns` | 9119 | `bind_up` y consultas DNS |
+| `blackbox-wordpress` | `blackbox-exporter` en `monitor` | 9115 | Disponibilidad y tiempo de respuesta de `tas-06.arpa` |
 
-**BIND9.** Se habilita el canal de estadísticas en `127.0.0.1:8053`, sin autenticación y por eso limitado a la interfaz local, validado con `named-checkconf` y aplicado con `rndc reconfig`. Todavía no existe un exporter que lo conecte a Prometheus.
+### Configuración relevante
+
+- **Máquinas:** `node_exporter` se instaló como paquete del sistema para medir el host real, incluso si Docker está detenido.
+- **Nginx:** `stub_status` solo en `127.0.0.1:8081`, leído por el exporter con `network_mode: host`.
+- **Apache:** `server-status` habilitado mediante `/opt/cms/status.conf`.
+- **MariaDB:** usuario `prometheus` limitado a `10.33.199.52`, con tres conexiones como máximo y los privilegios `PROCESS`, `REPLICATION CLIENT` y `SELECT`; credenciales en `.my.cnf` con permisos 600.
+- **BIND9:** canal de estadísticas solo en `127.0.0.1:8053`.
+- **Sitio:** la sonda acepta el certificado interno (`insecure_skip_verify`), con un tiempo límite de 10 s.
+
+### Dashboards y acceso
+
+| Dashboard | Contenido |
+|---|---|
+| `nodo-sur-overview` | MariaDB, Apache, Nginx, BIND9 y disponibilidad del sitio |
+| `nodo-sur-maquinas` | Estado, tiempo encendida, CPU, memoria, disco, carga y red de cada VM |
+
+Los paneles de disponibilidad combinan la métrica del servicio con `up`, de modo que la caída de un exporter se muestra como `DOWN` y no conserva el último valor recibido. Grafana se publica en `grafana.tas-06.arpa` a través de Nginx. Prometheus se consulta por túnel SSH a través del bastión (`AllowTcpForwarding local`).
+
+El puerto 9100 se permite solo desde el monitor en `cms-1`, `cms-2` y `db`, y desde las redes de Docker en `monitor`. En `dns`, donde UFW está inactivo, `node_exporter` escucha solo en la IP privada.
 
 ## 5.2 Alertas y trazabilidad de logs
 
-- **Alertas (actualización 27/11):** Prometheus evalúa 17 reglas de máquinas y servicios (`alerts.yml`, `maquinas.yml` y `servicios.yml`) y Alertmanager (puerto 9093) envía los avisos a un canal de Discord. Las cinco VMs se monitorizan además con `node_exporter` (puerto 9100).
-- **Logs:** Recolectados y centralizados en Loki (retención de 7 días). Sincronización horaria por NTP en todos los nodos (RNF-08).
+### Flujo de alertas
+
+**Reglas → Prometheus → Alertmanager → Discord.** Alertmanager agrupa por nombre de alerta, espera 10 s antes del primer envío, repite cada 4 horas mientras la falla siga activa y tiene habilitado el aviso de recuperación. La URL del webhook es un secreto y no se versiona.
+
+### Reglas (17)
+
+| Alerta | Condición | Espera | Severidad |
+|---|---|---|---|
+| `PrometheusTargetDown` | Prometheus no responde a su propia consulta | 1 min | critical |
+| `MaquinaCaida` | VM sin respuesta de `node_exporter` | 1 min | critical |
+| `CpuAlta` | CPU > 85 % | 5 min | warning |
+| `MemoriaAlta` | Memoria > 90 % | 5 min | warning |
+| `DiscoLleno` | Disco raíz > 85 % | 5 min | warning |
+| `ExporterCaido` | Exporter de servicio sin respuesta | 1 min | critical |
+| `SitioCaido` | La sonda HTTP falla | 1 min | critical |
+| `SitioLento` | Respuesta > 3 s | 5 min | warning |
+| `CertificadoPorVencer` | Menos de 14 días de vigencia | 1 h | warning |
+| `NginxCaido` | `nginx_up = 0` | 1 min | critical |
+| `ApacheCaido` | Una réplica con `apache_up = 0` | 1 min | warning |
+| `SinReplicasWeb` | Ninguna réplica web disponible | 1 min | critical |
+| `ApacheSaturado` | > 90 % de workers ocupados | 5 min | warning |
+| `MariaDBCaida` | `mysql_up = 0` | 1 min | critical |
+| `ConexionesMariaDBAltas` | > 80 % de las conexiones en uso | 5 min | warning |
+| `ConsultasLentas` | > 10 consultas lentas en 5 min | 5 min | warning |
+| `DNSCaido` | `bind_up = 0` | 1 min | critical |
+
+### Validación
+
+| Prueba | Resultado |
+|---|---|
+| Consulta `up{job="node"}` | Las cinco VM respondieron `1` |
+| `promtool check config` | 17 reglas válidas |
+| `amtool check-config` | Configuración válida |
+| Detener `node_exporter` en `cms-2` | `MaquinaCaida` pasó por `pending` y el aviso llegó a Discord |
+
+### Problemas resueltos
+
+| Problema | Causa | Solución |
+|---|---|---|
+| Todos los servicios en `DOWN` (24/11) | La recarga de UFW borró las reglas de red de Docker en `monitor` | Reiniciar Docker y los contenedores; fijar esas reglas queda pendiente |
+| Sin métricas de `cms-2` en el puerto 9100 | UFW bloqueaba el puerto | Permitirlo desde el monitor |
+| Paneles en `UP` con Docker detenido | Mostraban el último dato recibido | Combinar la métrica del servicio con `up` |
+| No llegaban alertas | Solo existía `alerts.yml` | Cargar `maquinas.yml` y `servicios.yml` |
+
+### Logs y hora
+
+Loki está desplegado con retención de 7 días y los nodos se sincronizan por NTP (RNF-08). El agente que envía los logs no está documentado.
+
+### Pendientes y límites
+
+- Cronometrar la caída de un servicio (RNF-05, ≤ 5 min), confirmar el aviso de recuperación y probar las reglas de servicios.
+- Documentar el agente de logs hacia Loki.
+- La caída de la VM `monitor` no genera avisos, porque allí residen Prometheus y Alertmanager.
+
+Procedimientos: [máquinas](../../configurations/configurar-grafana-maquinas.md), [alertas](../../configurations/configurar-alertas.md) y [VM de monitoreo](../../configurations/configurar-vm-monitoreo.md).
 
 ## 5.3 Respaldos automáticos de MariaDB y copia externa
 
@@ -514,9 +600,9 @@ Cada elemento comparado se clasifica con una de las siguientes categorías:
 | Punto de entrada y balanceo | Nginx en el nodo perimetral junto con DNS, en lugar del HAProxy del enunciado (ADR-002) | Nginx como proxy inverso con balanceo round robin y detección pasiva (`max_fails`, `fail_timeout`) | Igual | Se mantuvo |
 | Archivos compartidos entre backends | Sin solución. Cada backend guardaba sus archivos de forma local | NFS alojado en la VM de base de datos, exportado solo a `.50` y `.51` (ADR-003) | NFS v4 con exportación a toda la subred `/29`, configuración e imágenes como volúmenes Docker NFS (p. ej. `wp_uploads_shared`), sin montaje NFS en el sistema operativo de los backends | Cambió, se concretó y presenta desviaciones |
 | Base de datos | MariaDB en VM separada | MariaDB 11 en contenedor, puerto 3306 restringido a `.50`, `.51` y `.52` | Igual, con reglas persistentes en `DOCKER-USER` y UFW en la VM | Se mantuvo y se concretó |
-| Monitorización | No contemplada | VM `monitor` con Prometheus, Alertmanager, Loki y Grafana, accesibles solo por túnel SSH | Igual, con versiones fijas, exporters de Nginx, Apache y MariaDB y trabajos definidos (`nginx-lb`, `mariadb`, `node`); `node_exporter` en las cinco VMs desde el 27/11 | Cambió y luego se concretó |
+| Monitorización | No contemplada | VM `monitor` con Prometheus, Alertmanager, Loki y Grafana, accesibles solo por túnel SSH | Grafana publicado además por Nginx; con versiones fijas, exporters de Nginx, Apache y MariaDB y trabajos definidos (`nginx-lb`, `mariadb`, `node`); `node_exporter` en las cinco VMs desde el 27/11 | Cambió y luego se concretó |
 | Respaldos | Un respaldo manual de la base anterior | Diseño automatizado con retención de 30 días y copia fuera del host | Dump automático en la VM de datos y copia externa diaria en el nodo perimetral, con verificación SHA-256 y retención de 30 días en ambos | Se concretó con desviaciones |
-| Seguridad de red | Sin controles específicos | UFW y reglas en `DOCKER-USER` | UFW y `DOCKER-USER` documentados y verificados en la VM `db` mediante `/etc/local.d/firewall.start` | Se concretó en `db` |
+| Seguridad de red | Sin controles específicos | UFW y reglas en `DOCKER-USER` | UFW y `DOCKER-USER` documentados y verificados en la VM `db` mediante `/etc/local.d/firewall.start`; UFW activo en `cms-2` y `monitor` e inactivo en el nodo perimetral | Se concretó en `db` |
 
 **Tabla 5.** Línea de tiempo según la bitácora general y la documentación de scripts. Las fechas corresponden a la puesta en marcha de cada elemento y no necesariamente al orden en que se diseñó.
 
@@ -536,6 +622,7 @@ Cada elemento comparado se clasifica con una de las siguientes categorías:
 | 18/11 | Primer respaldo ejecutado por cron, seguido de los del 20 y el 22 | Respaldos automáticos (RNF-06) |
 | 22/11 | Llave SSH dedicada y copia externa diaria en el nodo perimetral | Copia fuera del host de origen (RNF-06) |
 | 23/11 | Cierre y entrega | Entrega 4 |
+| 27/11 | Monitoreo de las VM, 17 reglas de alerta y envío a Discord | Detección de fallas (RNF-05) |
 
 ### 7.2.3 Elementos que se mantuvieron
 
@@ -547,7 +634,7 @@ La estructura general de la solución no cambió entre el diseño y la implement
 - **Nginx como balanceador con detección pasiva.** La decisión del ADR-002 se sostuvo. Las limitaciones que el diseño declaró desde el inicio, como no detectar contenido distinto entre nodos ni la caída de la base de datos, siguen siendo las mismas.
 - **Separación de la base de datos.** MariaDB 11 permanece en una VM propia, con el puerto 3306 abierto únicamente a los dos backends y al monitor.
 - **Ubicación del NFS en la VM de datos.** El diseño aceptó desde el inicio que base de datos y archivos compartieran punto único de falla. La implementación respetó esa decisión y no la modificó.
-- **Esquema de monitorización.** Los servicios de observabilidad escuchan solo en `127.0.0.1` y se consultan mediante túnel SSH (`AllowTcpForwarding local`) a través del bastión. Los exporters usan los mismos puertos previstos (9113, 9117 y 9104).
+- **Esquema de monitorización.** Prometheus se consulta mediante túnel SSH (`AllowTcpForwarding local`) a través del bastión; Grafana se publica además por Nginx. Los exporters usan los mismos puertos previstos (9113, 9117 y 9104).
 - **Conjunto de requerimientos.** Los nueve requerimientos de la Entrega 1 (RF-01 y RNF-01 a RNF-08) se mantienen con sus mismos umbrales. No se agregaron, eliminaron ni relajaron criterios, lo que permite evaluar el cumplimiento final con la misma vara que se fijó al inicio.
 - **Puntos únicos de falla declarados.** El nodo perimetral y la VM de datos siguen siendo los mismos que el diseño señaló como riesgo residual, sin mitigación adicional. Esto es consistente con el alcance declarado, que excluye la alta disponibilidad real de esos componentes.
 
@@ -588,7 +675,7 @@ La Entrega 1 fijó varios controles y verificaciones que la documentación final
 | Respaldo de archivos del NFS y de configuraciones | La documentación lo declara pendiente | Una falla del disco dejaría sin imágenes ni configuración | Agregar ambos al flujo de respaldo y a la copia externa |
 | Restauración medida en un entorno de prueba | El procedimiento está definido en un contenedor aparte, pero no se ha ejecutado | RTO y RPO continúan sin medirse | Restaurar en el contenedor de prueba y registrar tiempos y conteo de tablas |
 | Script de salud activo con `curl` a cada backend | No se documenta | No hay compensación para la detección pasiva de Nginx | Implementarlo con cron y alerta |
-| Exporter para el canal de estadísticas de BIND9 | La documentación indica que no está configurado | El DNS no tiene observabilidad | Incorporarlo o declarar el alcance excluido |
+| Punto único de aviso | Prometheus y Alertmanager corren en `monitor` y Discord es el único destino | Si cae esa VM o su salida a internet, nadie es avisado | Agregar vigilancia externa y un segundo canal |
 | Prueba de capacidad N-1 y ajuste de `MaxRequestWorkers` | No se documentan resultados | El criterio de que un backend absorba el pico sigue sin validarse | Ejecutar `k6` o `ab` con un solo backend activo |
 | `DISALLOW_FILE_MODS` y `DISABLE_WP_CRON` | No se documentan | Riesgo de divergencia de plugins y de tareas programadas duplicadas | Aplicar y adjuntar la configuración |
 | Plugin de reservas con cupos | No se nombra | El flujo de talleres con cupos limitados queda sin su componente identificado | Documentar el plugin elegido, que la Entrega 1 dejó entre Amelia y Bookly |
@@ -598,7 +685,7 @@ La Entrega 1 fijó varios controles y verificaciones que la documentación final
 | Exporter de MariaDB publicado en `0.0.0.0:9104` en la VM de datos | El listado de contenedores del 10/11 lo muestra abierto a todas las interfaces y UFW lo permite solo desde el monitor | UFW no protege puertos publicados por Docker, de modo que el puerto queda accesible desde cualquier origen que alcance la VM | Publicarlo en la IP privada o agregar una regla en `DOCKER-USER`, y aclarar si el exporter corre en `db`, en `monitor` o en ambas |
 | Recursión de BIND9 | El script de monitorización muestra `allow-recursion` y `allow-query-cache` en `any`, mientras la sección 3.3 declara la recursión restringida a la `/29` | Resolvedor abierto a cualquier origen, con riesgo de uso en ataques de amplificación | Confirmar la configuración vigente y limitarla a `10.33.199.48/29` y `localhost` |
 | Exportación NFS | Se exporta a toda la `/29` con `no_root_squash` y propietario `nobody:nobody` | Un cliente con privilegios de root en la subred podría actuar como root sobre los archivos compartidos | Exportar solo a `.50` y `.51` y evaluar `root_squash` con propietario `www-data` |
-| Firewall en `cms-1`, `cms-2`, `monitor` y nodo perimetral | La documentación registra la extensión del patrón como recomendación y no como cambio aplicado | Los puertos 8080 y 9117 podrían quedar sin restricción de origen | Aplicar y adjuntar las reglas por nodo, con prueba de reinicio |
+| Firewall del nodo perimetral y verificación de los demás | UFW está inactivo en el nodo perimetral. Se comprobó activo en `cms-2` y `monitor`; falta adjuntar las reglas de `cms-1` | El nodo con acceso público no filtra por UFW | Activar UFW con las reglas de SSH, DNS, web y exporters, y adjuntar las reglas por nodo con prueba de reinicio |
 | Zona horaria homogénea | La VM `db` usa hora de Chile, mientras el nodo perimetral y los contenedores usan UTC | Dificulta la correlación de eventos entre logs (RNF-08) | Fijar `TZ` en contenedores y servidores o documentar la convención usada |
 
 ### 7.2.6 Comparación por requerimiento
@@ -676,7 +763,7 @@ La comparación permite observar qué anticipó correctamente la Entrega 1 y qu�
 
 La arquitectura definida en la Entrega 1 se mantuvo en su estructura. Los cinco nodos, sus direcciones, los flujos entre ellos, las tecnologías principales y las decisiones de los ADR siguen siendo los mismos. Los cambios ocurridos fueron de implementación y de detalle, y se explican en su mayoría por dos motivos: la adopción de contenedores, que obligó a replantear el firewall y el servidor web de los backends, y la necesidad de resolver el estado compartido entre dos nodos.
 
-Respecto de la continuidad operacional, el avance sobre lo comprometido en el diseño es sustancial. Los respaldos pasaron de ser un archivo manual a un flujo automático de dos etapas, con verificación de integridad, retención de 30 días y copia fuera del host de origen, y la observabilidad cubre proxy, backends y base de datos con exporters de alcance mínimo.
+Respecto de la continuidad operacional, el avance sobre lo comprometido en el diseño es sustancial. Los respaldos pasaron de ser un archivo manual a un flujo automático de dos etapas, con verificación de integridad, retención de 30 días y copia fuera del host de origen, y la observabilidad cubre proxy, backends, base de datos, DNS, el sitio y las cinco VM, con alertas a Discord.
 
 Las diferencias relevantes entre el diseño y el resultado no están en la arquitectura sino en los controles que la hacen verificable y en algunas configuraciones de acceso. La detección sin cronometrar, la frecuencia de respaldo, la restauración sin probar, el respaldo pendiente del NFS, las cuentas SSH por consolidar y las IP públicas por retirar concentran las brechas operativas de la Tabla 6. A ellas se suman tres configuraciones que se apartan del diseño y que convendría corregir o justificar, que son la exportación del NFS, el puerto 9104 y la recursión de BIND9. Ninguna de ellas exige rediseñar la solución. Todas se cierran con configuración y con evidencia.
 
@@ -722,13 +809,15 @@ Como trabajo futuro se contempla la separación de DNS y Nginx, la replicación 
 4. **Respaldo no generado o inválido:** revisar `/var/log/backup-db.log` en `db` y `~/pull-db.log` en el nodo perimetral, comprobar el espacio con `df -h` y verificar los checksums con `sha256sum -c *.sha256` en ambas ubicaciones.
 5. **Restauración de la base de datos (procedimiento previsto, aún no probado):** levantar un contenedor `mariadb:11` aparte, sin puertos ni volúmenes compartidos, restaurar con `gunzip -c` hacia `docker exec -i`, verificar las bases `mydb` y `mysql`, medir con `time` y eliminar el contenedor.
 6. **Pérdida de acceso por firewall:** desde la consola de la plataforma ejecutar `ufw disable`, `iptables -F INPUT` y `iptables -P INPUT ACCEPT`.
+7. **VM en `DOWN`:** comprobar que la VM esté encendida, que `node_exporter` esté activo (`rc-service node-exporter status`, o `systemctl status prometheus-node-exporter` en el nodo perimetral) y que el puerto 9100 esté permitido.
+8. **Alerta que no llega:** revisar en orden las reglas (`promtool check config`), el estado en `/api/v1/alerts`, `amtool alert query` y los registros de Alertmanager.
 
 ## Anexo E — Bitácora de cambios
 - **2026-09-09:** Estructuración inicial del repositorio e inventario de infraestructura.
 - **2026-09-10:** Migración e importación de la base de datos desde la VM auxiliar hacia la VM `db`, con habilitación de acceso remoto al puerto 3306 y resolución DNS para `tas-06.arpa`.
 - **2026-09-20:** Despliegue de backends Docker con contenedores WordPress y montaje NFS compartido.
-- **2026-11-15:** Puesta en marcha de la VM de monitorización (`monitor`) con Prometheus, Alertmanager, Loki, Grafana y exporters.
 - **2026-11-10:** Prueba del volcado con las opciones definitivas, hallazgo de la diferencia de zona horaria entre contenedor y VM, y creación de `backup-db.sh` en `db`.
+- **2026-11-15:** Puesta en marcha de la VM de monitorización (`monitor`) con Prometheus, Alertmanager, Loki, Grafana y exporters.
 - **2026-11-18:** Primer respaldo ejecutado automáticamente por cron, seguido de los del 20 y el 22 de noviembre.
 - **2026-11-22:** Creación de la llave dedicada `id_pull`, del archivo de llaves `/etc/ssh/authorized_keys.d/database` y del bloque `Match User database` en `sshd_config`, y puesta en marcha de `pull-db.sh` en el nodo perimetral con cron a las 07:00 UTC.
 - **2026-11-27:** Instalación de `node_exporter` en las cinco VMs, dashboard de máquinas en Grafana, carga de 17 reglas de alerta y envío a Discord desde Alertmanager, probado deteniendo el exporter de `cms-2`.
@@ -746,6 +835,7 @@ Como trabajo futuro se contempla la separación de DNS y Nginx, la replicación 
 ## Anexo H — Uso de inteligencia artificial
 Registro conforme a `bitacora/uso-ia.md`:
 - **Claude:** Soporte en redacción de scripts de respaldo, comandos SQL, resolución de errores de red y diagnóstico de DNS para `tas-06.arpa`.
+- **Claude (27/11):** Guía para instalar `node_exporter`, dashboard de máquinas, reglas de alerta, configuración del envío a Discord y actualización de la documentación.
 - *Validación:* Todo script o comando generado por IA fue probado empíricamente en el laboratorio antes de su integración.
 
 ## Anexo I — Correspondencia con las rúbricas
