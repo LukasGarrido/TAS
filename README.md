@@ -132,7 +132,47 @@ El sistema de respaldo implementa una estrategia de dos etapas que cumple con la
 
 ---
 
-## 8. Referencias y Documentación Técnica
+## 8. Rutas de Acceso
+
+### 8.1 Aplicaciones
+
+| Servicio | URL |
+|---|---|
+| CMS (WordPress) | <http://tas-06.arpa/> |
+| Grafana: dashboard `nodo-sur-overview` | <http://grafana.tas-06.arpa/d/nodo-sur-overview/60c97ed?orgId=1&from=now-6h&to=now&timezone=browser&var-instance=mysqld-exporter:9104&var-replica=$__all&refresh=5s> |
+
+### 8.2 Prometheus (por túnel SSH)
+
+Prometheus escucha solo en `127.0.0.1:9090` de la VM `monitor`. Abrir el túnel desde el equipo personal, reemplazando `<usuario_bastion>` y `<usuario_monitor>`, y mantener la sesión abierta:
+
+```sh
+ssh -J <usuario_bastion>@10.33.195.184 -L 9090:127.0.0.1:9090 <usuario_monitor>@10.33.199.52
+```
+
+| Endpoint | URL |
+|---|---|
+| Estado de los targets | <http://localhost:9090/targets> |
+| Targets en JSON | <http://localhost:9090/api/v1/targets> |
+| Configuración cargada | <http://localhost:9090/config> |
+
+### 8.3 Targets que consulta Prometheus
+
+Estas direcciones pertenecen a la red interna; se definen en `/opt/nodo-sur-monitoring/prometheus/prometheus.yml`.
+
+| Job | Target | Qué mide |
+|---|---|---|
+| `prometheus` | `http://prometheus:9090/metrics` | El propio Prometheus |
+| `nginx-lb` | `http://10.33.199.49:9113/metrics` | Nginx (balanceador) |
+| `apache-wordpress` | `http://10.33.199.51:9117/metrics` | Apache en `cms-1` |
+| `apache-wordpress` | `http://10.33.199.50:9117/metrics` | Apache en `cms-2` |
+| `mariadb` | `http://mysqld-exporter:9104/metrics` | MariaDB |
+| `blackbox-wordpress` | `http://blackbox-exporter:9115/probe?module=http_2xx&target=http://tas-06.arpa` | Disponibilidad HTTP del CMS |
+
+Los nombres `prometheus`, `mysqld-exporter` y `blackbox-exporter` solo se resuelven dentro de la red de Docker Compose de `monitor`.
+
+---
+
+## 9. Referencias y Documentación Técnica
 
 Para desplegar, administrar o auditar la plataforma, consulte los manuales específicos en la carpeta `configurations/`:
 - `configurations/scripts_docker.md` — Instalación y despliegue de contenedores.
@@ -145,7 +185,7 @@ Para desplegar, administrar o auditar la plataforma, consulte los manuales espec
 
 ---
 
-## 9. Licencia / Uso Académico
+## 10. Licencia / Uso Académico
 
 Proyecto desarrollado con fines académicos para la asignatura **EIN-090B · Taller de Administración de Sistemas**, Universidad Técnica Federico Santa María (Sede Concepción).
 
