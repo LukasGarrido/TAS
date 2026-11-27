@@ -141,7 +141,7 @@ El sistema de respaldo implementa una estrategia de dos etapas que cumple con la
 | Servicio | URL |
 |---|---|
 | CMS (WordPress) | <http://tas-06.arpa/> |
-| Grafana: dashboard `nodo-sur-maquinas` (estado de las VMs) | <http://grafana.tas-06.arpa/d/nodo-sur-maquinas> |
+| Grafana: dashboard `nodo-sur-maquinas` (estado de las VMs) | <http://grafana.tas-06.arpa/d/nodo-sur-maquinas/nodo-sur-maquinas?orgId=1&from=now-6h&to=now&timezone=browser&var-host=$__all&refresh=5s> |
 | Grafana: dashboard `nodo-sur-overview` | <http://grafana.tas-06.arpa/d/nodo-sur-overview/60c97ed?orgId=1&from=now-6h&to=now&timezone=browser&var-instance=mysqld-exporter:9104&var-replica=$__all&refresh=5s> |
 
 ### 8.2 Prometheus (por túnel SSH)
