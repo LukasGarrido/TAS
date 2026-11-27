@@ -54,6 +54,8 @@ nodo-sur/
 │   ├── entorno-de-trabajo.md
 │   └── uso-ia.md
 ├── configurations/
+│   ├── configurar-grafana-maquinas.md
+│   ├── grafana-maquinas.json
 │   ├── configurar-grafana-mariadb.md
 │   ├── configurar-grafana-nginx.md
 │   ├── configurar-grafana-wordpress.md
@@ -139,6 +141,7 @@ El sistema de respaldo implementa una estrategia de dos etapas que cumple con la
 | Servicio | URL |
 |---|---|
 | CMS (WordPress) | <http://tas-06.arpa/> |
+| Grafana: dashboard `nodo-sur-maquinas` (estado de las VMs) | <http://grafana.tas-06.arpa/d/nodo-sur-maquinas> |
 | Grafana: dashboard `nodo-sur-overview` | <http://grafana.tas-06.arpa/d/nodo-sur-overview/60c97ed?orgId=1&from=now-6h&to=now&timezone=browser&var-instance=mysqld-exporter:9104&var-replica=$__all&refresh=5s> |
 
 ### 8.2 Prometheus (por túnel SSH)
@@ -167,6 +170,12 @@ Estas direcciones pertenecen a la red interna; se definen en `/opt/nodo-sur-moni
 | `apache-wordpress` | `http://10.33.199.50:9117/metrics` | Apache en `cms-2` |
 | `mariadb` | `http://mysqld-exporter:9104/metrics` | MariaDB |
 | `blackbox-wordpress` | `http://blackbox-exporter:9115/probe?module=http_2xx&target=http://tas-06.arpa` | Disponibilidad HTTP del CMS |
+| `bind9-dns` | `http://10.33.199.49:9119/metrics` | BIND9 (DNS) |
+| `node` | `http://10.33.199.49:9100/metrics` | Estado de la VM `dns` |
+| `node` | `http://10.33.199.51:9100/metrics` | Estado de la VM `cms-1` |
+| `node` | `http://10.33.199.50:9100/metrics` | Estado de la VM `cms-2` |
+| `node` | `http://10.33.199.53:9100/metrics` | Estado de la VM `db` |
+| `node` | `http://10.33.199.52:9100/metrics` | Estado de la VM `monitor` |
 
 Los nombres `prometheus`, `mysqld-exporter` y `blackbox-exporter` solo se resuelven dentro de la red de Docker Compose de `monitor`.
 
@@ -179,6 +188,7 @@ Para desplegar, administrar o auditar la plataforma, consulte los manuales espec
 - `configurations/scripts_Servidor_NFS.md` — Configuración del servidor y volúmenes NFS.
 - `configurations/scripts_firewall_ufw.md` — Endpoints, UFW y reglas `DOCKER-USER`.
 - `configurations/configurar-vm-monitoreo.md` — Configuración de la VM de monitoreo.
+- `configurations/configurar-grafana-maquinas.md` — Monitoreo de las máquinas con `node_exporter`.
 - `configurations/scripts_DataBase-Grafana.md` — Integración de Bases de Datos y Grafana.
 - `configurations/respaldos-mariadb.md` — Arquitectura y operación de respaldos automáticos.
 - `decisions/` — Registros de Decisiones de Arquitectura (ADR-001 y ADR-002).
@@ -202,6 +212,8 @@ Documentación, bitácoras, configuraciones y registros de arquitectura del repo
   - [`uso-ia.md`](binnacle/uso-ia.md)
 
 - **[configurations/](configurations/)** — Scripts y manuales de configuración de servicios:
+  - [`configurar-grafana-maquinas.md`](configurations/configurar-grafana-maquinas.md)
+  - [`grafana-maquinas.json`](configurations/grafana-maquinas.json)
   - [`configurar-grafana-mariadb.md`](configurations/configurar-grafana-mariadb.md)
   - [`configurar-grafana-nginx.md`](configurations/configurar-grafana-nginx.md)
   - [`configurar-grafana-wordpress.md`](configurations/configurar-grafana-wordpress.md)
