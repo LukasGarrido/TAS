@@ -35,7 +35,7 @@ Como proveedores de infraestructura, el equipo ha justificado cada decisión té
 | 2 | Plataforma base y CMS funcional | 05/09/2026 | [Completado] |
 | 3 | Publicación resiliente y seguridad | 23/09/2026 | [Completado] |
 | 4 | Observabilidad y continuidad operacional | 23/11/2026 | [Completado] |
-| 5 | Incidente, auditoría y defensa final | 30/11/2026 | [Completado] |
+| 5 | Incidente, auditoría y defensa final | 27/11/2026 | [Completado] |
 
 ---
 
